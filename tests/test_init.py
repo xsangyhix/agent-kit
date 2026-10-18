@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -65,7 +66,7 @@ class InitTests(unittest.TestCase):
         self.addCleanup(self.repo.close)
         self.root = self.repo.root
 
-    def run_init(self, path=None, harness=None, force=False, stdin=None):
+    def run_init(self, path=None, harness=None, force=False, stdin=None, payload=None):
         stdout = io.StringIO()
         stderr = io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -75,6 +76,7 @@ class InitTests(unittest.TestCase):
                 force,
                 stdin or FakeStdin(),
                 stdout,
+                payload=payload,
             )
         return code, stdout.getvalue(), stderr.getvalue()
 
@@ -86,6 +88,13 @@ class InitTests(unittest.TestCase):
 
     def lock_data(self):
         return json.loads((self.root / ".agents" / "kit.lock").read_text("utf-8"))
+
+    def copied_payload(self):
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, folder, True)
+        target = folder / "payload"
+        shutil.copytree(PAYLOAD, target)
+        return target
 
     def assert_nothing_written(self):
         self.assertFalse((self.root / ".agents" / "kit").exists())
@@ -114,6 +123,22 @@ class InitTests(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertTrue(target.is_file(), target)
                 self.assertEqual(target.read_bytes(), source.read_bytes())
+
+    def test_fresh_repo_does_not_copy_bytecode_caches(self):
+        payload = self.copied_payload()
+        cache = payload / "kit" / "__pycache__"
+        cache.mkdir()
+        (cache / "check_tracker.cpython-314.pyc").write_bytes(b"cache\n")
+        (payload / "kit" / "stray.pyc").write_bytes(b"cache\n")
+
+        self.install(payload=payload)
+
+        self.assertFalse((self.root / ".agents/kit/__pycache__").exists())
+        self.assertFalse((self.root / ".agents/kit/stray.pyc").exists())
+        self.assertNotIn(
+            ".agents/kit/__pycache__/check_tracker.cpython-314.pyc",
+            self.lock_data()["files"],
+        )
 
     def test_fresh_repo_writes_the_harness_file(self):
         self.install()
