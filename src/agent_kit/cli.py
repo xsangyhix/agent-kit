@@ -76,5 +76,8 @@ def main(argv: list[str] | None = None) -> int:
             args.path, args.harness, args.force, sys.stdin, sys.stdout
         )
 
+    if args.command == "update":
+        return installer.update(args.path, args.force, sys.stdin, sys.stdout)
+
     print(f"{PROG}: {args.command} is not implemented yet", file=sys.stderr)
     return 2

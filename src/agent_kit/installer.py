@@ -100,9 +100,10 @@ def apply_block(text, block):
     raise ValueError(f"bad kit block: {state.reason}")
 
 
-def init(root, harness_name, force, stdin, stdout):
+def init(root, harness_name, force, stdin, stdout, payload=None):
     """Install the kit into root. Return the process exit code."""
     root = Path(root).resolve()
+    source = Path(payload) if payload is not None else payload_root()
     harness_name = harness_name or DEFAULT_HARNESS
 
     # Every check runs before anything is written.
@@ -170,24 +171,10 @@ def init(root, harness_name, force, stdin, stdout):
 
     # The checks are done; write the kit.
     created = []
-    copied = _copy_tree(root, payload_root() / "kit", kit_dir)
-    created.extend(copied)
-    copied = _copy_tree(root, payload_root() / "skills", skills_dir)
-    created.extend(copied)
-
-    hook = kit_dir / "hooks" / "pre-commit"
-    if hook.is_file():
-        hook.chmod(0o755)
-
-    harness_file = kit_dir / "harness.sh"
-    _write_text(
-        harness_file,
-        HARNESS_SH.format(markers=" ".join(harness.agent_markers)),
-    )
-    created.append(harness_file.relative_to(root).as_posix())
+    _copy_payload(root, source, harness, created)
 
     kept = []
-    templates_root = payload_root() / "templates"
+    templates_root = source / "templates"
     for name in TEMPLATES:
         destination = root / name
         if destination.exists():
@@ -197,17 +184,7 @@ def init(root, harness_name, force, stdin, stdout):
         destination.write_bytes((templates_root / name).read_bytes())
         created.append(name)
 
-    block = _read_text(payload_root() / "agents-block.md").rstrip("\n")
-    agents_path = root / AGENTS
-    agents_text = _read_text(agents_path)
-    block_state = find_block(agents_text)
-    _write_text(agents_path, apply_block(agents_text, block))
-    if block_state.state == "absent":
-        block_action = "appended"
-    elif AGENTS in created:
-        block_action = "filled from the template"
-    else:
-        block_action = "replaced"
+    block_action, block_text = _write_kit_block(root, source, AGENTS in created)
 
     for folder in GITKEEP_FOLDERS:
         if not (root / folder).is_dir():
@@ -217,32 +194,108 @@ def init(root, harness_name, force, stdin, stdout):
 
     _ensure_gitattributes(root, created)
 
-    result = subprocess.run(
-        ["git", "-C", str(root), "config", "core.hooksPath", ".agents/kit/hooks"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(
-            "Could not set core.hooksPath: " + result.stderr.strip(),
-            file=stdout,
-        )
+    if not _set_hooks_path(root, stdout):
         return 1
 
-    files = {
-        path.relative_to(root).as_posix(): file_hash(path)
-        for path in _kit_owned_files(root, harness)
-    }
     write_lock(
         root,
         __version__,
         harness.name,
-        files,
-        text_hash(block + "\n"),
+        _kit_owned_hashes(root, harness),
+        text_hash(block_text),
     )
     created.append(LOCK_FILE)
 
     _print_summary(stdout, harness.name, created, kept, block_action)
+    return 0
+
+
+def update(root, force, stdin, stdout, payload=None):
+    """Update an installed kit. Return the process exit code."""
+    root = Path(root).resolve()
+    source = Path(payload) if payload is not None else payload_root()
+
+    # Every check runs before anything is written.
+    if not _is_git_root(root):
+        print(f"{root} is not the root of a git repository.", file=sys.stderr)
+        return 2
+
+    try:
+        existing = read_lock(root)
+    except ValueError:
+        existing = None
+    if existing is None or not isinstance(existing.get("files"), dict):
+        print(
+            "agent-kit is not installed here. Use `agent-kit init`.",
+            file=sys.stderr,
+        )
+        return 2
+
+    harness_name = existing.get("harness")
+    if harness_name not in HARNESSES:
+        print(
+            f"Unknown harness '{harness_name}'. "
+            f"Known harnesses: {', '.join(sorted(HARNESSES))}.",
+            file=sys.stderr,
+        )
+        return 2
+
+    harness = HARNESSES[harness_name]
+    agents_path = root / AGENTS
+    agents_text = _read_text(agents_path) if agents_path.is_file() else None
+    state = find_block(agents_text) if agents_text is not None else None
+
+    changes = _local_changes(root, existing, harness, state, agents_text)
+    if changes:
+        if not force:
+            print(
+                "Cannot update: these kit-owned files were changed in this project:",
+                file=stdout,
+            )
+            for path, reason in changes:
+                print(f"  {path} ({reason})", file=stdout)
+            print(
+                "Kit-owned files are changed in the agent-kit repo, not in a "
+                "project. Move your change there, restore the files, or rerun "
+                "with --force to discard them.",
+                file=stdout,
+            )
+            return 1
+
+        if not confirm_deletion([path for path, _ in changes], stdin, stdout):
+            return 1
+
+    if state is not None and state.state == "bad":
+        print(
+            "Cannot update: AGENTS.md has a broken agent-kit block: "
+            f"{state.reason}.",
+            file=stdout,
+        )
+        return 1
+
+    # The checks are done; replace the kit-owned folders.
+    for folder in (root / KIT_DIR, root / harness.skills_dir):
+        if folder.exists():
+            _remove_folder(folder)
+
+    created = []
+    _copy_payload(root, source, harness, created)
+    block_action, block_text = _write_kit_block(root, source)
+    _ensure_gitattributes(root, created)
+
+    if not _set_hooks_path(root, stdout):
+        return 1
+
+    files = _kit_owned_hashes(root, harness)
+    write_lock(root, __version__, harness.name, files, text_hash(block_text))
+
+    _print_update_summary(
+        stdout,
+        existing.get("kit_version", "unknown"),
+        existing["files"],
+        files,
+        block_action,
+    )
     return 0
 
 
@@ -282,6 +335,100 @@ def _remove_folder(folder):
         shutil.rmtree(str(folder))
     else:
         folder.unlink()
+
+
+def _local_changes(root, existing, harness, state, agents_text):
+    """Return (path, reason) pairs for local changes to kit-owned files."""
+    changes = []
+    files = existing["files"]
+    for name, digest in files.items():
+        path = root / name
+        if not path.is_file():
+            changes.append((name, "missing"))
+        elif file_hash(path) != digest:
+            changes.append((name, "modified"))
+
+    for folder in (root / KIT_DIR, root / harness.skills_dir):
+        for name in _files_under(root, folder):
+            if name not in files:
+                changes.append((name, "not installed by agent-kit"))
+
+    if state is None or state.state == "absent":
+        changes.append((AGENTS, "kit block missing markers"))
+    elif state.state == "ok":
+        if text_hash(_block_text(agents_text, state)) != existing.get(
+            "agents_block"
+        ):
+            changes.append((AGENTS, "kit block in AGENTS.md modified"))
+
+    changes.sort()
+    return changes
+
+
+def _block_text(text, state):
+    """Return the text the kit lock hashes: between the marker lines."""
+    segment = text[state.begin + len(BEGIN) : state.end]
+    if segment.startswith("\r\n"):
+        return segment[2:]
+    if segment.startswith("\n"):
+        return segment[1:]
+    return segment
+
+
+def _copy_payload(root, source, harness, created):
+    """Copy the payload into the project and write harness.sh."""
+    source = Path(source)
+    created.extend(_copy_tree(root, source / "kit", root / KIT_DIR))
+    created.extend(_copy_tree(root, source / "skills", root / harness.skills_dir))
+
+    hook = root / KIT_DIR / "hooks" / "pre-commit"
+    if hook.is_file():
+        hook.chmod(0o755)
+
+    harness_file = root / KIT_DIR / "harness.sh"
+    _write_text(
+        harness_file,
+        HARNESS_SH.format(markers=" ".join(harness.agent_markers)),
+    )
+    created.append(harness_file.relative_to(root).as_posix())
+
+
+def _write_kit_block(root, source, agents_created=False):
+    """Write the kit block; return the action and the text the lock hashes."""
+    block = _read_text(Path(source) / "agents-block.md").rstrip("\n")
+    agents_path = root / AGENTS
+    agents_text = _read_text(agents_path) if agents_path.is_file() else ""
+    state = find_block(agents_text)
+    _write_text(agents_path, apply_block(agents_text, block))
+    if state.state == "absent":
+        action = "appended"
+    elif agents_created:
+        action = "filled from the template"
+    else:
+        action = "replaced"
+    return action, block + "\n"
+
+
+def _set_hooks_path(root, stdout):
+    result = subprocess.run(
+        ["git", "-C", str(root), "config", "core.hooksPath", ".agents/kit/hooks"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(
+            "Could not set core.hooksPath: " + result.stderr.strip(),
+            file=stdout,
+        )
+        return False
+    return True
+
+
+def _kit_owned_hashes(root, harness):
+    return {
+        path.relative_to(root).as_posix(): file_hash(path)
+        for path in _kit_owned_files(root, harness)
+    }
 
 
 def _copy_tree(root, source, target):
@@ -351,6 +498,36 @@ def _print_summary(stdout, harness_name, created, kept, block_action):
         print("Kept:", file=stdout)
         for path in kept:
             print(f"  {path}", file=stdout)
+        print("", file=stdout)
+
+    print(f"Kit block: {block_action} in AGENTS.md.", file=stdout)
+    print("Next: review and commit the changes.", file=stdout)
+
+
+def _print_update_summary(stdout, old_version, old_files, new_files, block_action):
+    print(
+        f"Updated agent-kit from {old_version} to {__version__}.",
+        file=stdout,
+    )
+    print("", file=stdout)
+
+    updated = sorted(
+        name
+        for name in new_files
+        if name in old_files and old_files[name] != new_files[name]
+    )
+    added = sorted(set(new_files) - set(old_files))
+    removed = sorted(set(old_files) - set(new_files))
+    for title, names in (
+        ("Updated", updated),
+        ("Added", added),
+        ("Removed", removed),
+    ):
+        if not names:
+            continue
+        print(f"{title}:", file=stdout)
+        for name in names:
+            print(f"  {name}", file=stdout)
         print("", file=stdout)
 
     print(f"Kit block: {block_action} in AGENTS.md.", file=stdout)

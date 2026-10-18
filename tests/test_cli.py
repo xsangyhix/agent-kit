@@ -29,12 +29,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stdout, "")
         self.assertIn("not the root of a git repository", stderr)
 
-    def test_update_is_not_implemented(self):
-        code, stdout, stderr = self.run_main(["update"])
+    def test_update_is_wired_to_the_installer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            code, stdout, stderr = self.run_main(["update", folder])
 
         self.assertEqual(code, 2)
         self.assertEqual(stdout, "")
-        self.assertIn("not implemented yet", stderr)
+        self.assertIn("not the root of a git repository", stderr)
 
     def test_no_arguments_prints_help_and_returns_two(self):
         code, stdout, stderr = self.run_main([])
