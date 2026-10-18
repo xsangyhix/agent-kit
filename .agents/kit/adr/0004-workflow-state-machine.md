@@ -1,0 +1,10 @@
+# 0004 — The workflow state machine
+
+- **Status**: accepted
+- **Context**: ADR 0002 named the eight states and their actors, but left one dead end. `blocked`'s only exit was unblocking, and `done` is the only state that closes, so a ticket the user had decided not to do could never leave `issues/`: it showed as open for ever, and `closed/` never recorded that the decision had been made. The tracker has to be able to record a decision not to revisit a ticket, from wherever the ticket had got to.
+- **Decision**:
+  - **States and actors.** Eight states, every transition performed by exactly one actor: `draft` (user) → `awaiting-agent` (agent) → `questioning` (user) / `in-progress` (agent) → `in-review` (user) → `done`; `review-feedback` (agent) is review's negative edge, and `blocked` (either) holds work whose handling is undecided. A transition may be open to either party; each performance of it still has exactly one actor.
+  - **The close.** `done` is reached two ways, both the user's: approving work that was submitted from `in-review`, or deciding not to revisit a ticket — which may be done from any state that is not `done`. The second needs no review round: it is a decision about the work, not a judgement of it.
+  - **Pickup.** The agent picks up `awaiting-agent`; `draft` and `blocked` are never pickable. Only the user brings a ticket out of `blocked`: by unblocking it to `awaiting-agent`, or by closing it as one they will not revisit.
+  - **Creation and close.** The user creates raw issues; the agent creates tickets, defaulting to `awaiting-agent`, and creates a `draft` only on explicit request. The user setting `Status: done` is the whole of the decision — there is no separate sign-off; the agent then performs the close.
+- **Consequences**: `.agents/kit/workflow.md` (now `Version: 3`) carries the states, the actors and the transitions; its transition block is the complete list. A ticket closed as not-revisited is `done`, so it satisfies a `Blocked by` edge and unblocks whatever claimed it. The `dev` guardrail is unaffected.

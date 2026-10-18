@@ -1,0 +1,5 @@
+source: https://github.com/mattpocock/skills
+commit: 49dd158d1076134a641b33efb035946536778336
+fetched: 2026-10-18
+license: MIT (see LICENSE in this folder)
+excluded: skills/deprecated/, skills/engineering/setup-matt-pocock-skills/
