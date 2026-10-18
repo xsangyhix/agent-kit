@@ -1,5 +1,4 @@
-Labels: ready-for-human
-Status: in-review
+Status: done
 
 ## Description
 
@@ -41,13 +40,13 @@ Test-Driven Development.
 
 ## Acceptance criteria
 
-- [ ] `update --force` with a modified kit file and an edited block prints the file under the heading, then the block line, then `Type 'yes' to delete them and continue: `.
-- [ ] `update --force` with only an edited block (and with only missing markers) prints the block line and `Type 'yes' to continue: `, with no deletion heading.
-- [ ] `AGENTS.md` never appears under "These paths will be deleted:".
-- [ ] Non-interactive stdin still refuses with the existing message and changes nothing.
-- [ ] `init --force` output is unchanged (existing tests pass).
-- [ ] `README.md`'s `--force` section describes both forms.
-- [ ] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
+- [x] `update --force` with a modified kit file and an edited block prints the file under the heading, then the block line, then `Type 'yes' to delete them and continue: `.
+- [x] `update --force` with only an edited block (and with only missing markers) prints the block line and `Type 'yes' to continue: `, with no deletion heading.
+- [x] `AGENTS.md` never appears under "These paths will be deleted:".
+- [x] Non-interactive stdin still refuses with the existing message and changes nothing.
+- [x] `init --force` output is unchanged (existing tests pass).
+- [x] `README.md`'s `--force` section describes both forms.
+- [x] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
 
 ## Out of scope
 
