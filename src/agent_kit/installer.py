@@ -83,20 +83,34 @@ def find_block(text):
     return BlockState("ok", begin, end, None)
 
 
+def _line_ending(text):
+    """Return the file's newline: CRLF when its first newline is one."""
+    newline = text.find("\n")
+    if newline > 0 and text[newline - 1] == "\r":
+        return "\r\n"
+    return "\n"
+
+
 def apply_block(text, block):
-    """Return text with the kit block written between the markers."""
-    content = block.replace("\r\n", "\n").rstrip("\n")
-    markers = f"{BEGIN}\n{content}\n{END}"
+    """Return text with the kit block written between the markers.
+
+    Every byte outside the markers is unchanged. The marker lines and the
+    block use the file's line ending, so a CRLF file stays CRLF; a file
+    whose first newline is LF (or that has none) stays LF.
+    """
+    newline = _line_ending(text)
+    content = block.replace("\r\n", "\n").rstrip("\n").replace("\n", newline)
+    markers = f"{BEGIN}{newline}{content}{newline}{END}"
     state = find_block(text)
 
     if state.state == "ok":
         return text[: state.begin] + markers + text[state.end + len(END) :]
 
     if state.state == "absent":
-        before = text.rstrip("\n")
+        before = text.rstrip("\r\n")
         if before:
-            return f"{before}\n\n{markers}\n"
-        return f"{markers}\n"
+            return before + newline + newline + markers + newline
+        return markers + newline
 
     raise ValueError(f"bad kit block: {state.reason}")
 
@@ -405,7 +419,7 @@ def _copy_payload(root, source, harness, created):
 
 def _write_kit_block(root, source, agents_created=False):
     """Write the kit block; return the action and the text the lock hashes."""
-    block = _read_text(Path(source) / "agents-block.md").rstrip("\n")
+    block = _read_text(Path(source) / "agents-block.md").replace("\r\n", "\n").rstrip("\n")
     agents_path = root / AGENTS
     agents_text = _read_text(agents_path) if agents_path.is_file() else ""
     state = find_block(agents_text)
@@ -515,7 +529,8 @@ def _ensure_gitattributes(root, created):
 
 
 def _read_text(path):
-    return path.read_text(encoding="utf-8")
+    """Read text without translating CRLF to LF (design §8)."""
+    return path.read_bytes().decode("utf-8")
 
 
 def _write_text(path, text):

@@ -274,6 +274,42 @@ class InitTests(unittest.TestCase):
         self.assertNotIn("old block", text)
         self.assertIn(block_content(), text)
 
+    def test_init_into_a_crlf_agents_with_markers_writes_crlf_and_keeps_bytes(self):
+        original = (
+            b"# Project\r\n\r\n"
+            b"<!-- agent-kit:begin -->\r\n"
+            b"old block\r\n"
+            b"<!-- agent-kit:end -->\r\n"
+            b"\r\n"
+            b"after\r\n"
+        )
+        self.repo.write("AGENTS.md", original)
+
+        self.install()
+
+        content = block_content().replace("\n", "\r\n")
+        expected = (
+            "# Project\r\n\r\n"
+            "<!-- agent-kit:begin -->\r\n"
+            + content
+            + "\r\n<!-- agent-kit:end -->\r\n\r\nafter\r\n"
+        ).encode("utf-8")
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), expected)
+
+    def test_init_into_a_crlf_agents_without_markers_appends_a_crlf_block(self):
+        self.repo.write("AGENTS.md", b"# Project\r\n\r\nMine.\r\n")
+
+        self.install()
+
+        content = block_content().replace("\n", "\r\n")
+        expected = (
+            "# Project\r\n\r\nMine.\r\n\r\n"
+            "<!-- agent-kit:begin -->\r\n"
+            + content
+            + "\r\n<!-- agent-kit:end -->\r\n"
+        ).encode("utf-8")
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), expected)
+
     def test_a_bad_marker_state_refuses_and_writes_nothing(self):
         self.repo.write("AGENTS.md", "before\n" + BEGIN + "\nno end marker\n")
 
@@ -581,6 +617,32 @@ class BlockTests(unittest.TestCase):
     def test_apply_block_refuses_a_bad_state(self):
         with self.assertRaises(ValueError):
             installer.apply_block(BEGIN + "\n", "new\n")
+
+    def test_apply_block_uses_the_files_crlf_line_ending(self):
+        text = "before\r\n{}\r\nold\r\n{}\r\nafter\r\n".format(BEGIN, END)
+
+        result = installer.apply_block(text, "one\ntwo\n")
+
+        self.assertEqual(
+            result,
+            "before\r\n{}\r\none\r\ntwo\r\n{}\r\nafter\r\n".format(BEGIN, END),
+        )
+
+    def test_apply_block_appends_to_a_crlf_file_with_crlf_separators(self):
+        result = installer.apply_block("before\r\n", "new\r\n")
+
+        self.assertEqual(
+            result,
+            "before\r\n\r\n{}\r\nnew\r\n{}\r\n".format(BEGIN, END),
+        )
+
+    def test_apply_block_uses_lf_when_the_file_has_no_newline(self):
+        result = installer.apply_block("one line only", "new\n")
+
+        self.assertEqual(
+            result,
+            "one line only\n\n{}\nnew\n{}\n".format(BEGIN, END),
+        )
 
 
 if __name__ == "__main__":

@@ -158,6 +158,38 @@ class UpdateTests(unittest.TestCase):
             "{}\n{}\n{}".format(BEGIN, block_content(payload), END), updated
         )
 
+    def test_update_a_crlf_agents_preserves_crlf_and_reports_no_changes(self):
+        content = block_content().replace("\n", "\r\n")
+        original = (
+            "# Project\r\n\r\nMine.\r\n\r\n"
+            "<!-- agent-kit:begin -->\r\n"
+            + content
+            + "\r\n<!-- agent-kit:end -->\r\n\r\nAfter.\r\n"
+        ).encode("utf-8")
+        self.repo.write("AGENTS.md", original)
+
+        code, stdout, stderr = self.run_update()
+
+        self.assertEqual(code, 0, stdout + stderr)
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), original)
+
+    def test_update_a_crlf_agents_without_markers_appends_a_crlf_block(self):
+        self.repo.write("AGENTS.md", b"# Project\r\n\r\nMine.\r\n")
+
+        code, stdout, stderr = self.run_update(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 0, stdout + stderr)
+        content = block_content().replace("\n", "\r\n")
+        expected = (
+            "# Project\r\n\r\nMine.\r\n\r\n"
+            "<!-- agent-kit:begin -->\r\n"
+            + content
+            + "\r\n<!-- agent-kit:end -->\r\n"
+        ).encode("utf-8")
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), expected)
+
     def test_templates_are_not_recreated_by_an_update(self):
         (self.root / "GLOSSARY.md").unlink()
 
