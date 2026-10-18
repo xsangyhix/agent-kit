@@ -11,6 +11,7 @@ from .harness import DEFAULT_HARNESS, HARNESSES
 from .lock import file_hash, read_lock, text_hash, write_lock
 
 KIT_DIR = ".agents/kit"
+HOOK = KIT_DIR + "/hooks/pre-commit"
 LOCK_FILE = ".agents/kit.lock"
 AGENTS = "AGENTS.md"
 TEMPLATES = ("AGENTS.md", "GLOSSARY.md", "docs/agents/project.md")
@@ -172,6 +173,8 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
     # The checks are done; write the kit.
     created = []
     _copy_payload(root, source, harness, created)
+    if not _record_hook_mode(root, stdout):
+        return 1
 
     kept = []
     templates_root = source / "templates"
@@ -280,6 +283,8 @@ def update(root, force, stdin, stdout, payload=None):
 
     created = []
     _copy_payload(root, source, harness, created)
+    if not _record_hook_mode(root, stdout):
+        return 1
     block_action, block_text = _write_kit_block(root, source)
     _ensure_gitattributes(root, created)
 
@@ -381,7 +386,7 @@ def _copy_payload(root, source, harness, created):
     created.extend(_copy_tree(root, source / "kit", root / KIT_DIR))
     created.extend(_copy_tree(root, source / "skills", root / harness.skills_dir))
 
-    hook = root / KIT_DIR / "hooks" / "pre-commit"
+    hook = root / HOOK
     if hook.is_file():
         hook.chmod(0o755)
 
@@ -418,6 +423,36 @@ def _set_hooks_path(root, stdout):
     if result.returncode != 0:
         print(
             "Could not set core.hooksPath: " + result.stderr.strip(),
+            file=stdout,
+        )
+        return False
+    return True
+
+
+def _record_hook_mode(root, stdout):
+    """Record the installed hook's executable bit in the git index.
+
+    `core.filemode` is false on Windows, so git would record a new hook as
+    100644 and a POSIX clone would silently skip it. This is the one index
+    change the tool makes; it never stages anything else or commits.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "update-index",
+            "--add",
+            "--chmod=+x",
+            HOOK,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(
+            "Could not record the hook's executable bit in the git index: "
+            + result.stderr.strip(),
             file=stdout,
         )
         return False

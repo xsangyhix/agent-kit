@@ -192,6 +192,28 @@ class UpdateTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout.strip(), ".agents/kit/hooks")
 
+    def test_update_records_the_hook_mode_in_the_index(self):
+        path = ".agents/kit/hooks/pre-commit"
+        self.repo.git("update-index", "--add", "--chmod=-x", path)
+        self.assertEqual(self.repo.index_mode(path), "100644")
+        self.repo.git("reset", "-q")
+
+        code, stdout, stderr = self.run_update()
+
+        self.assertEqual(code, 0, stdout + stderr)
+        self.assertEqual(self.repo.index_mode(path), "100755")
+
+    def test_update_stages_only_the_hook_and_makes_no_commit(self):
+        self.repo.git("reset", "-q")
+
+        code, stdout, stderr = self.run_update()
+
+        self.assertEqual(code, 0, stdout + stderr)
+        self.assertEqual(
+            self.repo.staged_paths(), [".agents/kit/hooks/pre-commit"]
+        )
+        self.assertFalse(self.repo.has_commits())
+
     # -- usage errors -----------------------------------------------------
 
     def test_a_missing_lock_is_a_usage_error(self):

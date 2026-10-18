@@ -152,6 +152,20 @@ class GitRepo:
     def commit(self, message="fixture"):
         self.git("commit", "-q", "-m", message)
 
+    def index_mode(self, relative):
+        """Return the mode git records for a path in the index, or None."""
+        entry = self.git("ls-files", "-s", "--", relative).stdout.split()
+        return entry[0] if entry else None
+
+    def staged_paths(self):
+        """Return the repo-relative paths in the index, staged and nothing else."""
+        return self.git("diff", "--cached", "--name-only").stdout.splitlines()
+
+    def has_commits(self):
+        """Return True when the repository has at least one commit."""
+        result = _run(["git", "rev-parse", "--verify", "-q", "HEAD"], cwd=self.root)
+        return result.returncode == 0
+
     def run_checker(self):
         return _run([sys.executable, str(CHECKER)], cwd=self.root)
 

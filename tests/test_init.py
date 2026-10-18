@@ -212,12 +212,27 @@ class InitTests(unittest.TestCase):
         self.assertIn("Next: review and commit the changes.", stdout)
 
     def test_the_installed_hook_is_executable(self):
+        self.install()
+
+        self.assertEqual(
+            self.repo.index_mode(".agents/kit/hooks/pre-commit"), "100755"
+        )
+
+    def test_the_installed_hook_keeps_its_mode_on_disk(self):
         if os.name == "nt":
             self.skipTest("POSIX mode bits are not meaningful on Windows")
         self.install()
 
         mode = (self.root / ".agents" / "kit" / "hooks" / "pre-commit").stat().st_mode
         self.assertEqual(mode & 0o777, 0o755)
+
+    def test_init_stages_only_the_hook_and_makes_no_commit(self):
+        self.install()
+
+        self.assertEqual(
+            self.repo.staged_paths(), [".agents/kit/hooks/pre-commit"]
+        )
+        self.assertFalse(self.repo.has_commits())
 
     # -- keeping project-owned files --------------------------------------
 
