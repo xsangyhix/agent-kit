@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from . import __version__
+from . import __version__, installer
 
 PROG = "agent-kit"
 
@@ -70,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 2
+
+    if args.command == "init":
+        return installer.init(
+            args.path, args.harness, args.force, sys.stdin, sys.stdout
+        )
 
     print(f"{PROG}: {args.command} is not implemented yet", file=sys.stderr)
     return 2

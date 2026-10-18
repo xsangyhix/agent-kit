@@ -1,5 +1,6 @@
 import contextlib
 import io
+import tempfile
 import unittest
 
 from agent_kit import cli
@@ -20,12 +21,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stdout, "agent-kit 0.1.0\n")
         self.assertEqual(stderr, "")
 
-    def test_init_is_not_implemented(self):
-        code, stdout, stderr = self.run_main(["init"])
+    def test_init_is_wired_to_the_installer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            code, stdout, stderr = self.run_main(["init", folder])
 
         self.assertEqual(code, 2)
         self.assertEqual(stdout, "")
-        self.assertIn("not implemented yet", stderr)
+        self.assertIn("not the root of a git repository", stderr)
 
     def test_update_is_not_implemented(self):
         code, stdout, stderr = self.run_main(["update"])
