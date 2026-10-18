@@ -15,6 +15,16 @@ project's git repository, and the kit records what it installed in `.agents/kit.
 so it can refuse to overwrite a project's own edits. opencode is the only supported
 harness for now; later harnesses plug into the same installation.
 
+## The kit block
+
+The kit owns the region of `AGENTS.md` between `<!-- agent-kit:begin -->` and
+`<!-- agent-kit:end -->`. A marker counts only when it stands on a line of its own: a
+line, with trailing whitespace and a trailing `\r` removed, must equal the marker
+exactly. Leading whitespace means the line is not a marker, and marker text inside a
+line of prose or an indented line is ordinary text: `init` and `update` neither count
+it nor touch it. Real marker lines are rewritten in canonical form, so trailing spaces
+on them are dropped. Everything outside the marker lines stays the project's.
+
 ## Requirements
 
 - **Python 3.14 or newer.** The `agent-kit` tool and the scripts it installs target

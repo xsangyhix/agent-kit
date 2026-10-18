@@ -190,6 +190,46 @@ class UpdateTests(unittest.TestCase):
         ).encode("utf-8")
         self.assertEqual((self.root / "AGENTS.md").read_bytes(), expected)
 
+    def test_an_inline_marker_mention_is_preserved_and_the_block_is_replaced(self):
+        mention = "The `<!-- agent-kit:begin -->` marker opens the block.\n\n"
+        original = (
+            mention
+            + BEGIN
+            + "\n"
+            + block_content()
+            + "\n"
+            + END
+            + "\n\nAfter.\n"
+        )
+        self.repo.write("AGENTS.md", original)
+        payload = self.newer_payload()
+
+        code, stdout, stderr = self.run_update(payload=payload, version="0.2.0")
+
+        self.assertEqual(code, 0, stdout + stderr)
+        expected = (
+            mention
+            + BEGIN
+            + "\n"
+            + block_content(payload)
+            + "\n"
+            + END
+            + "\n\nAfter.\n"
+        )
+        self.assertEqual(read_text(self.root / "AGENTS.md"), expected)
+
+    def test_marker_lines_with_trailing_spaces_report_no_changes(self):
+        original = read_text(self.root / "AGENTS.md")
+        spaced = original.replace(BEGIN + "\n", BEGIN + "   \n", 1).replace(
+            END + "\n", END + "  \n", 1
+        )
+        self.repo.write("AGENTS.md", spaced)
+
+        code, stdout, stderr = self.run_update()
+
+        self.assertEqual(code, 0, stdout + stderr)
+        self.assertEqual(read_text(self.root / "AGENTS.md"), original)
+
     def test_templates_are_not_recreated_by_an_update(self):
         (self.root / "GLOSSARY.md").unlink()
 

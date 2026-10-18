@@ -57,30 +57,63 @@ def confirm_deletion(paths, stdin, stdout):
 
 
 def find_block(text):
-    """Return the state of the kit block in AGENTS.md (design §5)."""
-    begins = text.count(BEGIN)
-    ends = text.count(END)
+    """Return the state of the kit block in AGENTS.md (design §5).
 
-    if begins == 0 and ends == 0:
+    A marker counts only when it stands on a line of its own. A marker
+    mentioned in prose, or indented, is ordinary text.
+    """
+    markers = _marker_lines(text)
+    begins = [start for kind, start in markers if kind == "begin"]
+    ends = [start for kind, start in markers if kind == "end"]
+
+    if not begins and not ends:
         return BlockState("absent", None, None, None)
 
-    if begins != 1 or ends != 1:
+    if len(begins) != 1 or len(ends) != 1:
         return BlockState(
             "bad",
             None,
             None,
             "expected exactly one begin marker and one end marker, "
-            f"found {begins} begin and {ends} end",
+            f"found {len(begins)} begin and {len(ends)} end",
         )
 
-    begin = text.index(BEGIN)
-    end = text.index(END)
+    begin = begins[0]
+    end = ends[0]
     if end < begin:
         return BlockState(
             "bad", None, None, "the end marker appears before the begin marker"
         )
 
     return BlockState("ok", begin, end, None)
+
+
+def _marker_lines(text):
+    """Return (kind, line start) for every marker line in text."""
+    markers = []
+    start = 0
+    while start <= len(text):
+        newline = text.find("\n", start)
+        content_end = len(text) if newline == -1 else newline
+        line = text[start:content_end].rstrip()
+        if line == BEGIN:
+            markers.append(("begin", start))
+        elif line == END:
+            markers.append(("end", start))
+        if newline == -1:
+            break
+        start = newline + 1
+    return markers
+
+
+def _line_content_end(text, start):
+    """Return the end of the line's content, before its line ending."""
+    newline = text.find("\n", start)
+    if newline == -1:
+        return len(text)
+    if newline > start and text[newline - 1] == "\r":
+        return newline - 1
+    return newline
 
 
 def _line_ending(text):
@@ -104,7 +137,8 @@ def apply_block(text, block):
     state = find_block(text)
 
     if state.state == "ok":
-        return text[: state.begin] + markers + text[state.end + len(END) :]
+        end = _line_content_end(text, state.end)
+        return text[: state.begin] + markers + text[end:]
 
     if state.state == "absent":
         before = text.rstrip("\r\n")
@@ -391,12 +425,10 @@ def _local_changes(root, existing, harness, state, agents_text):
 
 def _block_text(text, state):
     """Return the text the kit lock hashes: between the marker lines."""
-    segment = text[state.begin + len(BEGIN) : state.end]
-    if segment.startswith("\r\n"):
-        return segment[2:]
-    if segment.startswith("\n"):
-        return segment[1:]
-    return segment
+    newline = text.find("\n", state.begin + len(BEGIN))
+    if newline == -1:
+        return ""
+    return text[newline + 1 : state.end]
 
 
 def _copy_payload(root, source, harness, created):

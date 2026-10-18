@@ -274,6 +274,93 @@ class InitTests(unittest.TestCase):
         self.assertNotIn("old block", text)
         self.assertIn(block_content(), text)
 
+    def test_agents_mentioning_markers_inline_is_not_a_block(self):
+        original = (
+            "# Project\n\n"
+            "The `<!-- agent-kit:begin -->` marker opens the block.\n"
+            "  <!-- agent-kit:end --> is ordinary text when indented.\n"
+        )
+        self.repo.write("AGENTS.md", original)
+
+        self.install()
+
+        text = read_text(self.root / "AGENTS.md")
+        self.assertTrue(text.startswith(original + "\n" + BEGIN + "\n"))
+        self.assertIn(original, text)
+        self.assertEqual(text.count("\n" + END + "\n"), 1)
+
+    def test_a_mention_beside_a_real_block_replaces_only_the_real_block(self):
+        original = (
+            "# Project\n\n"
+            "The `<!-- agent-kit:begin -->` marker opens the block.\n\n"
+            + BEGIN
+            + "\nold block\n"
+            + END
+            + "\n\nAfter.\n"
+        )
+        self.repo.write("AGENTS.md", original)
+
+        self.install()
+
+        expected = (
+            "# Project\n\n"
+            "The `<!-- agent-kit:begin -->` marker opens the block.\n\n"
+            + BEGIN
+            + "\n"
+            + block_content()
+            + "\n"
+            + END
+            + "\n\nAfter.\n"
+        )
+        self.assertEqual(read_text(self.root / "AGENTS.md"), expected)
+
+    def test_marker_lines_with_trailing_spaces_are_rewritten_canonically(self):
+        original = (
+            "Before.\n"
+            + BEGIN
+            + "   \nold block\n"
+            + END
+            + " \t\nAfter.\n"
+        )
+        self.repo.write("AGENTS.md", original)
+
+        self.install()
+
+        expected = (
+            "Before.\n"
+            + BEGIN
+            + "\n"
+            + block_content()
+            + "\n"
+            + END
+            + "\nAfter.\n"
+        )
+        self.assertEqual(read_text(self.root / "AGENTS.md"), expected)
+
+    def test_crlf_marker_lines_with_trailing_spaces_still_count(self):
+        original = (
+            b"Before.\r\n"
+            + BEGIN.encode("utf-8")
+            + b"  \r\nold\r\n"
+            + END.encode("utf-8")
+            + b"\t\r\nAfter.\r\n"
+        )
+        self.repo.write("AGENTS.md", original)
+
+        self.install()
+
+        content = block_content().replace("\n", "\r\n")
+        expected = (
+            "Before.\r\n"
+            + BEGIN
+            + "\r\n"
+            + content
+            + "\r\n"
+            + END
+            + "\r\nAfter.\r\n"
+        ).encode("utf-8")
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), expected)
+
     def test_init_into_a_crlf_agents_with_markers_writes_crlf_and_keeps_bytes(self):
         original = (
             b"# Project\r\n\r\n"
@@ -599,6 +686,66 @@ class BlockTests(unittest.TestCase):
 
         self.assertEqual(state.state, "bad")
         self.assertIn("before", state.reason)
+
+    def test_an_inline_marker_mention_is_not_a_marker(self):
+        text = (
+            "See `<!-- agent-kit:begin -->` in the prose.\n"
+            "  <!-- agent-kit:end --> is indented, so it is prose too.\n"
+        )
+
+        state = installer.find_block(text)
+
+        self.assertEqual(state.state, "absent")
+
+    def test_a_mention_and_a_real_block_report_only_the_real_block(self):
+        text = (
+            "See `<!-- agent-kit:begin -->` in the prose.\n"
+            + BEGIN
+            + "\nold\n"
+            + END
+            + "\n"
+        )
+
+        state = installer.find_block(text)
+
+        self.assertEqual(state.state, "ok")
+        self.assertEqual(text[state.begin : state.begin + len(BEGIN)], BEGIN)
+        self.assertEqual(text[state.end : state.end + len(END)], END)
+
+    def test_marker_lines_with_trailing_spaces_are_markers(self):
+        text = BEGIN + "  \nold\n" + END + "\t\n"
+
+        state = installer.find_block(text)
+
+        self.assertEqual(state.state, "ok")
+
+    def test_a_marker_line_with_a_marker_in_the_middle_is_not_a_marker(self):
+        text = "before " + BEGIN + "\n" + END + "\nafter\n"
+
+        state = installer.find_block(text)
+
+        self.assertEqual(state.state, "bad")
+        self.assertIn("0 begin", state.reason)
+
+    def test_apply_block_rewrites_marker_lines_canonically(self):
+        text = "before\n" + BEGIN + "  \nold\n" + END + "\t\nafter\n"
+
+        result = installer.apply_block(text, "new\n")
+
+        self.assertEqual(
+            result, "before\n{}\nnew\n{}\nafter\n".format(BEGIN, END)
+        )
+
+    def test_apply_block_preserves_an_inline_marker_mention(self):
+        mention = "See `" + BEGIN + "` above.\n"
+        text = mention + BEGIN + "\nold\n" + END + "\nafter\n"
+
+        result = installer.apply_block(text, "new\n")
+
+        self.assertEqual(
+            result,
+            mention + "{}\nnew\n{}\nafter\n".format(BEGIN, END),
+        )
 
     def test_apply_block_replaces_an_existing_block(self):
         text = "before\n{}\nold\n{}\nafter\n".format(BEGIN, END)
