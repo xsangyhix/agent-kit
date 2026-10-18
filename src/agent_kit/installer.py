@@ -140,28 +140,24 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
     skills_dir = root / harness.skills_dir
     conflicts = _files_under(root, kit_dir) + _files_under(root, skills_dir)
     conflicts.sort()
+    agents_path = root / AGENTS
+    state = find_block(_read_text(agents_path)) if agents_path.exists() else None
 
-    if conflicts:
-        if not force:
-            print(
-                "Cannot install: these paths already exist and would be replaced:",
-                file=stdout,
-            )
-            for path in conflicts:
-                print(path, file=stdout)
-            print(
-                "Move them out of the way, or rerun with --force to delete them.",
-                file=stdout,
-            )
-            return 1
+    if conflicts and not force:
+        print(
+            "Cannot install: these paths already exist and would be replaced:",
+            file=stdout,
+        )
+        for path in conflicts:
+            print(path, file=stdout)
+        print(
+            "Move them out of the way, or rerun with --force to delete them.",
+            file=stdout,
+        )
+        return 1
 
-        if not confirm_deletion(conflicts, stdin, stdout):
-            return 1
-        for folder in (kit_dir, skills_dir):
-            if folder.exists():
-                _remove_folder(folder)
-
-    state = find_block(_read_text(root / AGENTS)) if (root / AGENTS).exists() else None
+    # The marker check runs before the deletion confirmation, so a refused run
+    # neither deletes anything nor asks the user to confirm it.
     if state is not None and state.state == "bad":
         print(
             "Cannot install: AGENTS.md has a broken agent-kit block: "
@@ -169,6 +165,13 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
             file=stdout,
         )
         return 1
+
+    if conflicts:
+        if not confirm_deletion(conflicts, stdin, stdout):
+            return 1
+        for folder in (kit_dir, skills_dir):
+            if folder.exists():
+                _remove_folder(folder)
 
     # The checks are done; write the kit.
     created = []
@@ -249,25 +252,23 @@ def update(root, force, stdin, stdout, payload=None):
     state = find_block(agents_text) if agents_text is not None else None
 
     changes = _local_changes(root, existing, harness, state, agents_text)
-    if changes:
-        if not force:
-            print(
-                "Cannot update: these kit-owned files were changed in this project:",
-                file=stdout,
-            )
-            for path, reason in changes:
-                print(f"  {path} ({reason})", file=stdout)
-            print(
-                "Kit-owned files are changed in the agent-kit repo, not in a "
-                "project. Move your change there, restore the files, or rerun "
-                "with --force to discard them.",
-                file=stdout,
-            )
-            return 1
+    if changes and not force:
+        print(
+            "Cannot update: these kit-owned files were changed in this project:",
+            file=stdout,
+        )
+        for path, reason in changes:
+            print(f"  {path} ({reason})", file=stdout)
+        print(
+            "Kit-owned files are changed in the agent-kit repo, not in a "
+            "project. Move your change there, restore the files, or rerun "
+            "with --force to discard them.",
+            file=stdout,
+        )
+        return 1
 
-        if not confirm_deletion([path for path, _ in changes], stdin, stdout):
-            return 1
-
+    # The marker check runs before the deletion confirmation, so a refused run
+    # neither deletes anything nor asks the user to confirm it.
     if state is not None and state.state == "bad":
         print(
             "Cannot update: AGENTS.md has a broken agent-kit block: "
@@ -275,6 +276,10 @@ def update(root, force, stdin, stdout, payload=None):
             file=stdout,
         )
         return 1
+
+    if changes:
+        if not confirm_deletion([path for path, _ in changes], stdin, stdout):
+            return 1
 
     # The checks are done; replace the kit-owned folders.
     for folder in (root / KIT_DIR, root / harness.skills_dir):

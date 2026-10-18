@@ -51,6 +51,19 @@ def lock_data(root):
     return json.loads((Path(root) / ".agents" / "kit.lock").read_text("utf-8"))
 
 
+def snapshot(root):
+    """Every file under root except .git, by repo-relative POSIX path."""
+    result = {}
+    for path in Path(root).rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if relative.parts[0] == ".git":
+            continue
+        result[relative.as_posix()] = path.read_bytes()
+    return result
+
+
 def copied_payload(test_case, payload=PAYLOAD):
     """Copy the payload into a temporary folder, cleaned up with the test."""
     folder = Path(tempfile.mkdtemp())

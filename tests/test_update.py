@@ -6,7 +6,6 @@ import json
 import subprocess
 import tempfile
 import unittest
-from pathlib import Path
 from unittest import mock
 
 from agent_kit import installer
@@ -19,6 +18,7 @@ from tests.guardrail.support import (
     read_text,
     sha256_file,
     sha256_text,
+    snapshot,
 )
 
 BEGIN = "<!-- agent-kit:begin -->"
@@ -43,19 +43,6 @@ def expected_files(payload):
                 )
     expected[".agents/kit/harness.sh"] = sha256_text(HARNESS_SH)
     return expected
-
-
-def snapshot(root):
-    """Every file under root except .git, by repo-relative POSIX path."""
-    result = {}
-    for path in Path(root).rglob("*"):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root)
-        if relative.parts[0] == ".git":
-            continue
-        result[relative.as_posix()] = path.read_bytes()
-    return result
 
 
 class UpdateTests(unittest.TestCase):
@@ -382,6 +369,23 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("These paths will be deleted:", stdout)
         self.assertIn(".agents/kit/workflow.md", stdout)
         self.assertIn("Aborted. Nothing was changed.", stdout)
+        self.assert_unchanged(before)
+
+    def test_force_with_a_broken_kit_block_refuses_before_asking(self):
+        path = self.root / ".agents/kit/workflow.md"
+        path.write_bytes(path.read_bytes() + b"local edit\n")
+        agents = self.root / "AGENTS.md"
+        text = agents.read_text("utf-8").replace(END, "", 1)
+        agents.write_text(text, encoding="utf-8")
+        before = snapshot(self.root)
+
+        code, stdout, _ = self.run_update(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("Cannot update: AGENTS.md has a broken agent-kit block", stdout)
+        self.assertNotIn("These paths will be deleted:", stdout)
         self.assert_unchanged(before)
 
     def test_force_with_yes_discards_local_edits_and_updates(self):

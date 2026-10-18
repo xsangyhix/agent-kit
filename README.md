@@ -171,6 +171,9 @@ Only the exact answer `yes` continues. Anything else prints `Aborted. Nothing wa
 changed.` and exits `1`. Without an interactive terminal the command is refused
 outright, so an agent session cannot use `--force`.
 
+Every check runs before the confirmation, so a run that would be refused — a broken kit
+block in `AGENTS.md`, for example — is refused without asking and with nothing deleted.
+
 ## Project-specific steps
 
 The kit's hook runs these project-owned files if they exist, and never creates them.

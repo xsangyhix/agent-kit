@@ -23,6 +23,7 @@ from tests.guardrail.support import (
     read_text,
     sha256_file,
     sha256_text,
+    snapshot,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -384,6 +385,22 @@ class InitTests(unittest.TestCase):
         self.assertIn(".agents/skills/demo/SKILL.md", stdout)
         self.assertIn("Aborted. Nothing was changed.", stdout)
         self.assertEqual(conflict.read_bytes(), b"mine\n")
+        self.assert_nothing_written()
+
+    def test_force_with_a_broken_kit_block_refuses_before_asking(self):
+        conflict = self.repo.write(".agents/skills/demo/SKILL.md", b"mine\n")
+        self.repo.write("AGENTS.md", "project text\n\n" + BEGIN + "\n")
+        before = snapshot(self.root)
+
+        code, stdout, _ = self.run_init(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("Cannot install: AGENTS.md has a broken agent-kit block", stdout)
+        self.assertNotIn("These paths will be deleted:", stdout)
+        self.assertEqual(conflict.read_bytes(), b"mine\n")
+        self.assertEqual(snapshot(self.root), before)
         self.assert_nothing_written()
 
     def test_force_with_yes_replaces_the_conflicting_folder(self):
