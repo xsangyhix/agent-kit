@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -25,13 +25,58 @@ Output must stay byte-identical for every command and outcome. The existing test
 
 ## Acceptance criteria
 
-- [ ] Each of the six smells is fixed, or left with a reason recorded in the review.
-- [ ] No test that asserts output, exit codes or file contents changed. Tests that only reached into a removed private name or string state may be adapted.
-- [ ] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
-- [ ] `PYTHONPATH=src py -3.14 -m agent_kit update` in this repo still reports no local changes and exits 0.
+- [x] Each of the six smells is fixed, or left with a reason recorded in the review.
+- [x] No test that asserts output, exit codes or file contents changed. Tests that only reached into a removed private name or string state may be adapted.
+- [x] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
+- [x] `PYTHONPATH=src py -3.14 -m agent_kit update` in this repo still reports no local changes and exits 0.
 
 ## Out of scope
 
 - Any change in behaviour or wording.
 - Adding type hints across the package. `cli.py` is the only module with them; whether to add them everywhere or remove them is a separate decision.
 - `src/agent_kit/lock.py` beyond being the single owner of the lock path.
+
+## Review
+
+Implementation complete, submitted for review.
+
+### Summary of changes
+
+All six smells are fixed.
+
+`src/agent_kit/installer.py`:
+
+- **Kit-owned folders:** `_kit_folders(root, harness)` names the two folders, and `_kit_owned_paths(root, harness)` walks them once through `_files_under`. The init conflict scan, both deletion loops, `_local_changes` and `_kit_owned_hashes` use them; `_kit_owned_files` is gone.
+- **Opening checks:** `_resolve_inputs`, `_require_git_root`, `_select_harness` and `_refuse_broken_block` hold what `init` and `update` shared. Messages, exit codes and streams are unchanged: exit-2 usage errors still go to `sys.stderr`, exit-1 refusals to the injected `stdout`, in the same order in each command.
+- **Block state:** `BlockKind` is an `enum.Enum` with `ABSENT`, `BAD` and `OK`. `find_block` returns the member and every caller compares identity instead of a string.
+- **Constants:** `LOCK_FILE` is gone; the installer imports `lock.LOCK_NAME`. `HOOKS_DIR` is derived from `KIT_DIR`, and `HOOK`, `GITATTRIBUTES_LINE` and `_set_hooks_path` derive from `HOOKS_DIR`.
+- **Summaries:** `_print_report(stdout, headline, sections, block_action)` prints both summaries' titled indented lists, the blank line after each and the shared two-line footer. `_print_summary` and `_print_update_summary` are gone; `update` builds its Updated/Added/Removed sections and passes them in.
+
+`src/agent_kit/cli.py`:
+
+- The unreachable "not implemented yet" branch at the end of `main` is removed.
+
+`tests/test_init.py`:
+
+- The block-state assertions now use `installer.BlockKind` with `assertIs`; no test that asserts output, exit codes or file contents changed.
+
+### Verification
+
+TDD: the `BlockTests` assertions were changed to the enum first and failed against the old string state (`AttributeError: module 'agent_kit.installer' has no attribute 'BlockKind'`). They passed once the enum landed. The other five smells are behaviour-preserving, so the existing suite is the proof; every test written for the previous tickets still passes unchanged.
+
+```
+py -3.14 -m unittest discover -s tests -t . -v
+Ran 137 tests in 105.732s
+
+OK (skipped=1)
+```
+
+The skip is the pre-existing Windows case, `test_the_installed_hook_keeps_its_mode_on_disk`; the packaging test ran and passed.
+
+`PYTHONPATH=src py -3.14 -m agent_kit update` exits 0, prints no local-change lists, and changes no file on disk.
+
+### Judgement calls
+
+- **None of the six smells was left in place.** Each had a concrete shared helper or single owner, so leaving one would have kept a duplicate the next ticket would have to reconcile.
+- **`BlockKind` rather than an enum named `BlockState`.** The existing `BlockState` is the namedtuple; keeping that name and adding `BlockKind` as its `state` field type avoids renaming the record and keeps the change inside the field the ticket called out.
+- **`_kit_owned_paths` returns strings, not `Path`s.** `_files_under` already produced repo-relative POSIX strings, and the three callers work in those strings (printing, lock keys and `file_hash`). Returning `Path`s would force a conversion at every call site.

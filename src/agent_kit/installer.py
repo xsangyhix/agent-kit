@@ -1,5 +1,6 @@
 """Install the kit into a project (design §8)."""
 
+import enum
 import shutil
 import subprocess
 import sys
@@ -8,15 +9,15 @@ from pathlib import Path
 
 from . import __version__
 from .harness import DEFAULT_HARNESS, HARNESSES
-from .lock import file_hash, read_lock, text_hash, write_lock
+from .lock import LOCK_NAME, file_hash, read_lock, text_hash, write_lock
 
 KIT_DIR = ".agents/kit"
-HOOK = KIT_DIR + "/hooks/pre-commit"
-LOCK_FILE = ".agents/kit.lock"
+HOOKS_DIR = KIT_DIR + "/hooks"
+HOOK = HOOKS_DIR + "/pre-commit"
 AGENTS = "AGENTS.md"
 TEMPLATES = ("AGENTS.md", "GLOSSARY.md", "docs/agents/project.md")
 GITATTRIBUTES = ".gitattributes"
-GITATTRIBUTES_LINE = ".agents/kit/hooks/* text eol=lf"
+GITATTRIBUTES_LINE = HOOKS_DIR + "/* text eol=lf"
 GITKEEP_FOLDERS = ("docs/adr", ".scratch")
 
 BEGIN = "<!-- agent-kit:begin -->"
@@ -27,11 +28,58 @@ HARNESS_SH = (
     'AGENT_MARKERS="{markers}"\n'
 )
 
+
+class BlockKind(enum.Enum):
+    ABSENT = "absent"
+    BAD = "bad"
+    OK = "ok"
+
+
 BlockState = namedtuple("BlockState", ["state", "begin", "end", "reason"])
 
 
 def payload_root():
     return Path(__file__).parent / "payload"
+
+
+def _resolve_inputs(root, payload):
+    """Return the resolved project root and the payload source."""
+    root = Path(root).resolve()
+    source = Path(payload) if payload is not None else payload_root()
+    return root, source
+
+
+def _require_git_root(root):
+    """Refuse root unless it is a git repository root; return success."""
+    if _is_git_root(root):
+        return True
+    print(f"{root} is not the root of a git repository.", file=sys.stderr)
+    return False
+
+
+def _select_harness(harness_name):
+    """Return the harness, or refuse an unknown one and return None."""
+    harness = HARNESSES.get(harness_name)
+    if harness is not None:
+        return harness
+    print(
+        f"Unknown harness '{harness_name}'. "
+        f"Known harnesses: {', '.join(sorted(HARNESSES))}.",
+        file=sys.stderr,
+    )
+    return None
+
+
+def _refuse_broken_block(command, state, stdout):
+    """Refuse a broken block; return whether it refused."""
+    if state is None or state.state is not BlockKind.BAD:
+        return False
+    print(
+        f"Cannot {command}: AGENTS.md has a broken agent-kit block: "
+        f"{state.reason}.",
+        file=stdout,
+    )
+    return True
 
 
 def confirm_deletion(paths, stdin, stdout, replaces_block=False):
@@ -77,11 +125,11 @@ def find_block(text):
     ends = [start for kind, start in markers if kind == "end"]
 
     if not begins and not ends:
-        return BlockState("absent", None, None, None)
+        return BlockState(BlockKind.ABSENT, None, None, None)
 
     if len(begins) != 1 or len(ends) != 1:
         return BlockState(
-            "bad",
+            BlockKind.BAD,
             None,
             None,
             "expected exactly one begin marker and one end marker, "
@@ -92,10 +140,13 @@ def find_block(text):
     end = ends[0]
     if end < begin:
         return BlockState(
-            "bad", None, None, "the end marker appears before the begin marker"
+            BlockKind.BAD,
+            None,
+            None,
+            "the end marker appears before the begin marker",
         )
 
-    return BlockState("ok", begin, end, None)
+    return BlockState(BlockKind.OK, begin, end, None)
 
 
 def _marker_lines(text):
@@ -146,11 +197,11 @@ def apply_block(text, block):
     markers = f"{BEGIN}{newline}{content}{newline}{END}"
     state = find_block(text)
 
-    if state.state == "ok":
+    if state.state is BlockKind.OK:
         end = _line_content_end(text, state.end)
         return text[: state.begin] + markers + text[end:]
 
-    if state.state == "absent":
+    if state.state is BlockKind.ABSENT:
         before = text.rstrip("\r\n")
         if before:
             return before + newline + newline + markers + newline
@@ -161,24 +212,18 @@ def apply_block(text, block):
 
 def init(root, harness_name, force, stdin, stdout, payload=None):
     """Install the kit into root. Return the process exit code."""
-    root = Path(root).resolve()
-    source = Path(payload) if payload is not None else payload_root()
+    root, source = _resolve_inputs(root, payload)
     harness_name = harness_name or DEFAULT_HARNESS
 
     # Every check runs before anything is written.
-    if not _is_git_root(root):
-        print(f"{root} is not the root of a git repository.", file=sys.stderr)
+    if not _require_git_root(root):
         return 2
 
-    if harness_name not in HARNESSES:
-        print(
-            f"Unknown harness '{harness_name}'. "
-            f"Known harnesses: {', '.join(sorted(HARNESSES))}.",
-            file=sys.stderr,
-        )
+    harness = _select_harness(harness_name)
+    if harness is None:
         return 2
 
-    if (root / LOCK_FILE).exists():
+    if (root / LOCK_NAME).exists():
         version = "unknown"
         try:
             existing = read_lock(root)
@@ -193,11 +238,7 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
         )
         return 2
 
-    harness = HARNESSES[harness_name]
-    kit_dir = root / KIT_DIR
-    skills_dir = root / harness.skills_dir
-    conflicts = _files_under(root, kit_dir) + _files_under(root, skills_dir)
-    conflicts.sort()
+    conflicts = _kit_owned_paths(root, harness)
     agents_path = root / AGENTS
     state = find_block(_read_text(agents_path)) if agents_path.exists() else None
 
@@ -216,18 +257,13 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
 
     # The marker check runs before the deletion confirmation, so a refused run
     # neither deletes anything nor asks the user to confirm it.
-    if state is not None and state.state == "bad":
-        print(
-            "Cannot install: AGENTS.md has a broken agent-kit block: "
-            f"{state.reason}.",
-            file=stdout,
-        )
+    if _refuse_broken_block("install", state, stdout):
         return 1
 
     if conflicts:
         if not confirm_deletion(conflicts, stdin, stdout):
             return 1
-        for folder in (kit_dir, skills_dir):
+        for folder in _kit_folders(root, harness):
             if folder.exists():
                 _remove_folder(folder)
 
@@ -268,20 +304,23 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
         _kit_owned_hashes(root, harness),
         text_hash(block_text),
     )
-    created.append(LOCK_FILE)
+    created.append(LOCK_NAME)
 
-    _print_summary(stdout, harness.name, created, kept, block_action)
+    _print_report(
+        stdout,
+        f"Installed agent-kit {__version__} (harness: {harness.name}).",
+        (("Created", created), ("Kept", kept)),
+        block_action,
+    )
     return 0
 
 
 def update(root, force, stdin, stdout, payload=None):
     """Update an installed kit. Return the process exit code."""
-    root = Path(root).resolve()
-    source = Path(payload) if payload is not None else payload_root()
+    root, source = _resolve_inputs(root, payload)
 
     # Every check runs before anything is written.
-    if not _is_git_root(root):
-        print(f"{root} is not the root of a git repository.", file=sys.stderr)
+    if not _require_git_root(root):
         return 2
 
     try:
@@ -295,16 +334,10 @@ def update(root, force, stdin, stdout, payload=None):
         )
         return 2
 
-    harness_name = existing.get("harness")
-    if harness_name not in HARNESSES:
-        print(
-            f"Unknown harness '{harness_name}'. "
-            f"Known harnesses: {', '.join(sorted(HARNESSES))}.",
-            file=sys.stderr,
-        )
+    harness = _select_harness(existing.get("harness"))
+    if harness is None:
         return 2
 
-    harness = HARNESSES[harness_name]
     agents_path = root / AGENTS
     agents_text = _read_text(agents_path) if agents_path.is_file() else None
     state = find_block(agents_text) if agents_text is not None else None
@@ -327,12 +360,7 @@ def update(root, force, stdin, stdout, payload=None):
 
     # The marker check runs before the deletion confirmation, so a refused run
     # neither deletes anything nor asks the user to confirm it.
-    if state is not None and state.state == "bad":
-        print(
-            "Cannot update: AGENTS.md has a broken agent-kit block: "
-            f"{state.reason}.",
-            file=stdout,
-        )
+    if _refuse_broken_block("update", state, stdout):
         return 1
 
     if changes:
@@ -344,7 +372,7 @@ def update(root, force, stdin, stdout, payload=None):
             return 1
 
     # The checks are done; replace the kit-owned folders.
-    for folder in (root / KIT_DIR, root / harness.skills_dir):
+    for folder in _kit_folders(root, harness):
         if folder.exists():
             _remove_folder(folder)
 
@@ -361,11 +389,21 @@ def update(root, force, stdin, stdout, payload=None):
     files = _kit_owned_hashes(root, harness)
     write_lock(root, __version__, harness.name, files, text_hash(block_text))
 
-    _print_update_summary(
+    old_files = existing["files"]
+    updated = sorted(
+        name
+        for name in files
+        if name in old_files and old_files[name] != files[name]
+    )
+    _print_report(
         stdout,
-        existing.get("kit_version", "unknown"),
-        existing["files"],
-        files,
+        f"Updated agent-kit from {existing.get('kit_version', 'unknown')} "
+        f"to {__version__}.",
+        (
+            ("Updated", updated),
+            ("Added", sorted(set(files) - set(old_files))),
+            ("Removed", sorted(set(old_files) - set(files))),
+        ),
         block_action,
     )
     return 0
@@ -402,6 +440,20 @@ def _files_under(root, folder):
     )
 
 
+def _kit_folders(root, harness):
+    """Return the two folders the kit owns."""
+    return (root / KIT_DIR, root / harness.skills_dir)
+
+
+def _kit_owned_paths(root, harness):
+    """Return the repo-relative paths of the kit-owned folders' files."""
+    return sorted(
+        name
+        for folder in _kit_folders(root, harness)
+        for name in _files_under(root, folder)
+    )
+
+
 def _remove_folder(folder):
     if folder.is_dir():
         shutil.rmtree(str(folder))
@@ -420,14 +472,13 @@ def _local_changes(root, existing, harness, state, agents_text):
         elif file_hash(path) != digest:
             changes.append((name, "modified"))
 
-    for folder in (root / KIT_DIR, root / harness.skills_dir):
-        for name in _files_under(root, folder):
-            if name not in files:
-                changes.append((name, "not installed by agent-kit"))
+    for name in _kit_owned_paths(root, harness):
+        if name not in files:
+            changes.append((name, "not installed by agent-kit"))
 
-    if state is None or state.state == "absent":
+    if state is None or state.state is BlockKind.ABSENT:
         changes.append((AGENTS, "kit block missing markers"))
-    elif state.state == "ok":
+    elif state.state is BlockKind.OK:
         if text_hash(_block_text(agents_text, state)) != existing.get(
             "agents_block"
         ):
@@ -470,7 +521,7 @@ def _write_kit_block(root, source, agents_created=False):
     agents_text = _read_text(agents_path) if agents_path.is_file() else ""
     state = find_block(agents_text)
     _write_text(agents_path, apply_block(agents_text, block))
-    if state.state == "absent":
+    if state.state is BlockKind.ABSENT:
         action = "appended"
     elif agents_created:
         action = "filled from the template"
@@ -481,7 +532,7 @@ def _write_kit_block(root, source, agents_created=False):
 
 def _set_hooks_path(root, stdout):
     result = subprocess.run(
-        ["git", "-C", str(root), "config", "core.hooksPath", ".agents/kit/hooks"],
+        ["git", "-C", str(root), "config", "core.hooksPath", HOOKS_DIR],
         capture_output=True,
         text=True,
     )
@@ -526,8 +577,8 @@ def _record_hook_mode(root, stdout):
 
 def _kit_owned_hashes(root, harness):
     return {
-        path.relative_to(root).as_posix(): file_hash(path)
-        for path in _kit_owned_files(root, harness)
+        name: file_hash(root / name)
+        for name in _kit_owned_paths(root, harness)
     }
 
 
@@ -544,17 +595,6 @@ def _copy_tree(root, source, target):
         shutil.copyfile(str(path), str(destination))
         written.append(destination.relative_to(root).as_posix())
     return written
-
-
-def _kit_owned_files(root, harness):
-    paths = [root / KIT_DIR, root / harness.skills_dir]
-    files = []
-    for folder in paths:
-        if folder.is_dir():
-            files.extend(
-                path for path in folder.rglob("*") if path.is_file()
-            )
-    return sorted(files)
 
 
 def _ensure_gitattributes(root, created):
@@ -584,48 +624,12 @@ def _write_text(path, text):
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _print_summary(stdout, harness_name, created, kept, block_action):
-    print(
-        f"Installed agent-kit {__version__} (harness: {harness_name}).",
-        file=stdout,
-    )
+def _print_report(stdout, headline, sections, block_action):
+    """Print a summary with titled lists and the common footer."""
+    print(headline, file=stdout)
     print("", file=stdout)
 
-    if created:
-        print("Created:", file=stdout)
-        for path in created:
-            print(f"  {path}", file=stdout)
-        print("", file=stdout)
-
-    if kept:
-        print("Kept:", file=stdout)
-        for path in kept:
-            print(f"  {path}", file=stdout)
-        print("", file=stdout)
-
-    print(f"Kit block: {block_action} in AGENTS.md.", file=stdout)
-    print("Next: review and commit the changes.", file=stdout)
-
-
-def _print_update_summary(stdout, old_version, old_files, new_files, block_action):
-    print(
-        f"Updated agent-kit from {old_version} to {__version__}.",
-        file=stdout,
-    )
-    print("", file=stdout)
-
-    updated = sorted(
-        name
-        for name in new_files
-        if name in old_files and old_files[name] != new_files[name]
-    )
-    added = sorted(set(new_files) - set(old_files))
-    removed = sorted(set(old_files) - set(new_files))
-    for title, names in (
-        ("Updated", updated),
-        ("Added", added),
-        ("Removed", removed),
-    ):
+    for title, names in sections:
         if not names:
             continue
         print(f"{title}:", file=stdout)

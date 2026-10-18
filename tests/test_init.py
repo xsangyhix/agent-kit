@@ -658,17 +658,20 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "ok")
+        self.assertIs(state.state, installer.BlockKind.OK)
         self.assertEqual(text[state.begin : state.begin + len(BEGIN)], BEGIN)
         self.assertEqual(text[state.end : state.end + len(END)], END)
 
     def test_no_markers_is_absent(self):
-        self.assertEqual(installer.find_block("plain text\n").state, "absent")
+        self.assertIs(
+            installer.find_block("plain text\n").state,
+            installer.BlockKind.ABSENT,
+        )
 
     def test_one_marker_is_bad_and_names_the_problem(self):
         state = installer.find_block("before\n" + BEGIN + "\n")
 
-        self.assertEqual(state.state, "bad")
+        self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("begin", state.reason)
 
     def test_duplicate_markers_are_bad(self):
@@ -676,7 +679,7 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "bad")
+        self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("2", state.reason)
 
     def test_an_end_before_a_begin_is_bad(self):
@@ -684,7 +687,7 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "bad")
+        self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("before", state.reason)
 
     def test_an_inline_marker_mention_is_not_a_marker(self):
@@ -695,7 +698,7 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "absent")
+        self.assertIs(state.state, installer.BlockKind.ABSENT)
 
     def test_a_mention_and_a_real_block_report_only_the_real_block(self):
         text = (
@@ -708,7 +711,7 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "ok")
+        self.assertIs(state.state, installer.BlockKind.OK)
         self.assertEqual(text[state.begin : state.begin + len(BEGIN)], BEGIN)
         self.assertEqual(text[state.end : state.end + len(END)], END)
 
@@ -717,14 +720,14 @@ class BlockTests(unittest.TestCase):
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "ok")
+        self.assertIs(state.state, installer.BlockKind.OK)
 
     def test_a_marker_line_with_a_marker_in_the_middle_is_not_a_marker(self):
         text = "before " + BEGIN + "\n" + END + "\nafter\n"
 
         state = installer.find_block(text)
 
-        self.assertEqual(state.state, "bad")
+        self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("0 begin", state.reason)
 
     def test_apply_block_rewrites_marker_lines_canonically(self):
