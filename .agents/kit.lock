@@ -1,11 +1,12 @@
 {
   "agents_block": "653986a3a2a3f7282dacea6540192ae2f652adc1081797bcb94fe8e90aa0008d",
   "files": {
-    ".agents/kit/GLOSSARY.md": "653784bb50d47bd6c8c23f446455072d72fc3d06699b862d389bde66a4307887",
+    ".agents/kit/GLOSSARY.md": "9c27847a13e12e60661ed22abe49b5bb8907218673ead8617deb43a7384c1dba",
     ".agents/kit/adr/0003-tracked-units.md": "93d4033f209eb61c3d2849ea0a1530872735ed9d33532a1caea5268ff21e8bec",
     ".agents/kit/adr/0004-workflow-state-machine.md": "a0ca4851d664c2809846182768657f647579ef43f9614ba5e9f27ec9ba450cc6",
     ".agents/kit/adr/0005-issue-labels.md": "f1b888a7a110e13d9a230c70e8fcb409abba336ae6837134c8d78c26ea534462",
     ".agents/kit/adr/0006-guardrails.md": "9520d571479657a51534120043712969046cfb6cab5637f397eddb9c8bbf1484",
+    ".agents/kit/adr/0007-grill-before-pickup.md": "5dc3727f55de849195426edd1f88f1582d272af5b1309f4607e6e7e76be9c545",
     ".agents/kit/adr/archived/0001-agent-workflow.md": "9dbb149fd14f2d3a72aea7c56f812d30b99d85e319b92891becc4e5a87436d12",
     ".agents/kit/adr/archived/0002-agent-workflow-v2.md": "4dfe7b0cceca1ec836a6ca79ece2f4cceb4ed56f7ca757254165877774df3159",
     ".agents/kit/check_tracker.py": "0a7aa30b1fe462a822eb8bd6679c1257b5845fe188d6297a8b84777787e277d4",
@@ -14,7 +15,7 @@
     ".agents/kit/hooks/pre-commit": "318bcf8ca86c0569284748cfd8398d7dce9b26385ab56f1f9f2a06fcee3d2f21",
     ".agents/kit/issue-tracker.md": "1f932bda90639bfd6967367fd572f52e2ce2a14572b76d218f7964d91721e6cb",
     ".agents/kit/triage-labels.md": "5037595fb1789c3394af7850bbce1d2107caf19332743374b78c5e05d6112018",
-    ".agents/kit/workflow.md": "c20714725b2fff816edfbdc58a67b07bc920fc2de583a3b23c3f4d8890aefb2d",
+    ".agents/kit/workflow.md": "d6427a516cf41603f2a68398a1668d9824649ebedb12f2dfca136ca77901af93",
     ".agents/skills/LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
     ".agents/skills/UPSTREAM": "066a74366300c902ef0300d1aede13c80657757b31c4d32cba18b30e31cc068a",
     ".agents/skills/engineering/README.md": "32d9469dda4e6103d952909cb83e657b7bec01bc582b6be4cec3b493f66920fd",

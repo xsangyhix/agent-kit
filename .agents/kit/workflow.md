@@ -1,6 +1,6 @@
 # Agent workflow
 
-Version: 3
+Version: 4
 
 This document defines how an agent works on an issue, from first draft to done. It is a state machine: every issue is in exactly one state, and every transition is performed by exactly one actor. A transition may be open to either party, but each performance of it still has exactly one actor.
 
@@ -11,7 +11,7 @@ Vocabulary is defined in `.agents/kit/GLOSSARY.md`. Layout, templates and paths 
 | State | Meaning | Set by | Label convention |
 | --- | --- | --- | --- |
 | `draft` | Created but not released. The agent ignores it. | user | `needs-triage` |
-| `awaiting-agent` | Released and pickable: the agent decides whether to ask or to begin. | user | `ready-for-agent` |
+| `awaiting-agent` | Released and pickable: the agent grills before it begins, unless the ticket leaves no doubts. | user | `ready-for-agent` |
 | `questioning` | The agent is asking and waiting for answers. | agent | `needs-info` |
 | `in-progress` | The agent is working. | agent | `ready-for-agent` |
 | `in-review` | Submitted; the user is reviewing. | agent | `ready-for-human` |
@@ -26,8 +26,8 @@ The "Set by" column is the point of this document: a state the agent owns, the a
 ```
 draft            ──(user releases)──▶                 awaiting-agent
 
-awaiting-agent   ──(agent asks)──▶                    questioning
-awaiting-agent   ──(agent ready)──▶                   in-progress
+awaiting-agent   ──(agent grills, questions open)──▶  questioning
+awaiting-agent   ──(ticket clear, agent begins)──▶    in-progress
 
 questioning      ──(user answers)──▶                  awaiting-agent
 
@@ -52,6 +52,8 @@ That is the complete list. If a needed transition is missing, that is a gap in t
 ## Picking up work
 
 The agent picks up issues in `awaiting-agent`. `draft` and `blocked` are never pickable. Either party may set `blocked`; only the user brings a ticket out of it — by unblocking it to `awaiting-agent`, or by closing it as one they will not revisit.
+
+Before beginning a ticket, the agent grills the user, using the `grilling` skill, to gather the details the implementation needs and to surface anything the ticket leaves open. The one case where it skips the grill is a ticket so clear that there are no doubts about its implementation. Questions the grill raises that the user does not settle go into `## Questions` and the ticket moves to `questioning`; a clean grill resolves straight into `in-progress`.
 
 `Blocked by` edges are respected independently of the state: the agent does not start a ticket whose listed blockers are not `done`. A ticket that cannot proceed, and that nobody has decided how to handle, is set to `blocked`.
 

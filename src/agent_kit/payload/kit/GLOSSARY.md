@@ -29,7 +29,7 @@ This file holds the agent workflow's vocabulary. Project terms live in the proje
 ### States
 
 - **`draft`** — created but not released; the agent ignores it. The hold state, and where the user's raw issues start.
-- **`awaiting-agent`** — released and pickable: the agent decides whether to ask or to begin.
+- **`awaiting-agent`** — released and pickable: the agent grills before it begins, unless the ticket leaves no doubts.
 - **`questioning`** — the agent is asking and waiting for answers.
 - **`in-progress`** — the agent is working.
 - **`in-review`** — the agent has submitted and the user is reviewing.

@@ -1,0 +1,10 @@
+# 0007 — Grill before pickup
+
+- **Status**: accepted
+- **Context**: The workflow released a ticket to `awaiting-agent` and told the agent to "decide whether to ask or to begin", but never said how that decision is made. A ticket that passes the definition of ready can still leave implementation details open — the edge cases behind the happy path, the exact edge of an out-of-scope line, a blocker the ticket declares but does not resolve — and the agent, reading only the file, had no prompt to surface them. The result was the agent either beginning on a ticket it half-understood, or improvising questions outside any transition.
+- **Decision**:
+  - **Grill on pickup.** Before beginning a ticket, the agent grills the user, using the `grilling` skill, to gather the details the implementation needs and surface what the ticket leaves open.
+  - **One exception.** The grill is skipped only for a ticket so clear that there are no doubts about its implementation. Clarity is the bar, not the ticket's origin: a ticket that passes the definition of ready is still grilled if anything is open.
+  - **No new state.** The grill reuses the existing transitions: questions the grill raises that the user does not settle park the ticket in `questioning` and go under `## Questions`; a clean grill resolves straight into `in-progress`. The stateless `grilling` primitive is enough because the ticket file is the record — the workflow already keeps its trail there, not in `GLOSSARY.md`.
+  - **Why the primitive, not the wrapper.** The instruction names `grilling` — the skill the agent invokes directly — and not a wrapper, because the wrappers are `disable-model-invocation: true`: user-facing slash commands whose body is that same call, which an agent cannot self-invoke.
+- **Consequences**: `.agents/kit/workflow.md` (now `Version: 4`) carries the pickup wording and the `awaiting-agent` transition labels, and `.agents/kit/GLOSSARY.md` the `awaiting-agent` definition. The grill is the human-in-the-loop form of the `ask` transition; the "no doubts" case is the `begin` transition. A ticket with open questions cannot be begun until its frontier is empty.
