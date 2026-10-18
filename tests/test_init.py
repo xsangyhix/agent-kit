@@ -194,7 +194,10 @@ class InitTests(unittest.TestCase):
         data = lock_data(self.root)
         self.assertEqual(data["kit_version"], "0.1.0")
         self.assertEqual(data["harness"], "opencode")
-        self.assertEqual(data["agents_block"], sha256_text(block_content() + "\n"))
+        self.assertEqual(
+            data["agents_block"],
+            sha256_text(installer.canonical_block_text(block_content())),
+        )
 
     def test_the_lock_is_sorted_two_space_json_with_a_trailing_newline(self):
         self.install()
@@ -653,10 +656,20 @@ class LockTests(unittest.TestCase):
 
 
 class BlockTests(unittest.TestCase):
+    def test_canonical_block_text_uses_lf_and_exactly_one_trailing_newline(self):
+        self.assertEqual(
+            installer.canonical_block_text("one\r\ntwo\r\n\r\n"),
+            "one\ntwo\n",
+        )
+        self.assertEqual(
+            installer.canonical_block_text("one\ntwo"),
+            "one\ntwo\n",
+        )
+
     def test_an_ok_block_reports_its_span(self):
         text = "before\n{}\nold\n{}\nafter\n".format(BEGIN, END)
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.OK)
         self.assertEqual(text[state.begin : state.begin + len(BEGIN)], BEGIN)
@@ -664,12 +677,12 @@ class BlockTests(unittest.TestCase):
 
     def test_no_markers_is_absent(self):
         self.assertIs(
-            installer.find_block("plain text\n").state,
+            installer.classify_block("plain text\n").state,
             installer.BlockKind.ABSENT,
         )
 
     def test_one_marker_is_bad_and_names_the_problem(self):
-        state = installer.find_block("before\n" + BEGIN + "\n")
+        state = installer.classify_block("before\n" + BEGIN + "\n")
 
         self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("begin", state.reason)
@@ -677,7 +690,7 @@ class BlockTests(unittest.TestCase):
     def test_duplicate_markers_are_bad(self):
         text = "{}\n{}\n{}\n{}\n".format(BEGIN, BEGIN, END, END)
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("2", state.reason)
@@ -685,7 +698,7 @@ class BlockTests(unittest.TestCase):
     def test_an_end_before_a_begin_is_bad(self):
         text = "{}\n{}\n".format(END, BEGIN)
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("before", state.reason)
@@ -696,7 +709,7 @@ class BlockTests(unittest.TestCase):
             "  <!-- agent-kit:end --> is indented, so it is prose too.\n"
         )
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.ABSENT)
 
@@ -709,7 +722,7 @@ class BlockTests(unittest.TestCase):
             + "\n"
         )
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.OK)
         self.assertEqual(text[state.begin : state.begin + len(BEGIN)], BEGIN)
@@ -718,14 +731,14 @@ class BlockTests(unittest.TestCase):
     def test_marker_lines_with_trailing_spaces_are_markers(self):
         text = BEGIN + "  \nold\n" + END + "\t\n"
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.OK)
 
     def test_a_marker_line_with_a_marker_in_the_middle_is_not_a_marker(self):
         text = "before " + BEGIN + "\n" + END + "\nafter\n"
 
-        state = installer.find_block(text)
+        state = installer.classify_block(text)
 
         self.assertIs(state.state, installer.BlockKind.BAD)
         self.assertIn("0 begin", state.reason)

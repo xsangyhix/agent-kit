@@ -35,6 +35,12 @@ class BlockKind(enum.Enum):
     OK = "ok"
 
 
+class BlockAction(enum.Enum):
+    APPENDED = "appended"
+    FILLED_FROM_TEMPLATE = "filled from the template"
+    REPLACED = "replaced"
+
+
 BlockState = namedtuple("BlockState", ["state", "begin", "end", "reason"])
 
 
@@ -114,7 +120,7 @@ def confirm_deletion(paths, stdin, stdout, replaces_block=False):
     return False
 
 
-def find_block(text):
+def classify_block(text):
     """Return the state of the kit block in AGENTS.md (design §5).
 
     A marker counts only when it stands on a line of its own. A marker
@@ -185,6 +191,11 @@ def _line_ending(text):
     return "\n"
 
 
+def canonical_block_text(block):
+    """Return the block text the lock hashes: LF endings, one trailing newline."""
+    return block.replace("\r\n", "\n").rstrip("\n") + "\n"
+
+
 def apply_block(text, block):
     """Return text with the kit block written between the markers.
 
@@ -193,9 +204,9 @@ def apply_block(text, block):
     whose first newline is LF (or that has none) stays LF.
     """
     newline = _line_ending(text)
-    content = block.replace("\r\n", "\n").rstrip("\n").replace("\n", newline)
+    content = canonical_block_text(block).removesuffix("\n").replace("\n", newline)
     markers = f"{BEGIN}{newline}{content}{newline}{END}"
-    state = find_block(text)
+    state = classify_block(text)
 
     if state.state is BlockKind.OK:
         end = _line_content_end(text, state.end)
@@ -240,7 +251,7 @@ def init(root, harness_name, force, stdin, stdout, payload=None):
 
     conflicts = _kit_owned_paths(root, harness)
     agents_path = root / AGENTS
-    state = find_block(_read_text(agents_path)) if agents_path.exists() else None
+    state = classify_block(_read_text(agents_path)) if agents_path.exists() else None
 
     if conflicts and not force:
         print(
@@ -340,7 +351,7 @@ def update(root, force, stdin, stdout, payload=None):
 
     agents_path = root / AGENTS
     agents_text = _read_text(agents_path) if agents_path.is_file() else None
-    state = find_block(agents_text) if agents_text is not None else None
+    state = classify_block(agents_text) if agents_text is not None else None
 
     changes = _local_changes(root, existing, harness, state, agents_text)
     if changes and not force:
@@ -479,7 +490,7 @@ def _local_changes(root, existing, harness, state, agents_text):
     if state is None or state.state is BlockKind.ABSENT:
         changes.append((AGENTS, "kit block missing markers"))
     elif state.state is BlockKind.OK:
-        if text_hash(_block_text(agents_text, state)) != existing.get(
+        if text_hash(_block_text_for_hash(agents_text, state)) != existing.get(
             "agents_block"
         ):
             changes.append((AGENTS, "kit block in AGENTS.md modified"))
@@ -488,12 +499,12 @@ def _local_changes(root, existing, harness, state, agents_text):
     return changes
 
 
-def _block_text(text, state):
-    """Return the text the kit lock hashes: between the marker lines."""
+def _block_text_for_hash(text, state):
+    """Return the text the lock hashes: the block between the marker lines."""
     newline = text.find("\n", state.begin + len(BEGIN))
     if newline == -1:
         return ""
-    return text[newline + 1 : state.end]
+    return canonical_block_text(text[newline + 1 : state.end])
 
 
 def _copy_payload(root, source, harness, created):
@@ -516,18 +527,18 @@ def _copy_payload(root, source, harness, created):
 
 def _write_kit_block(root, source, agents_created=False):
     """Write the kit block; return the action and the text the lock hashes."""
-    block = _read_text(Path(source) / "agents-block.md").replace("\r\n", "\n").rstrip("\n")
+    block = _read_text(Path(source) / "agents-block.md")
     agents_path = root / AGENTS
     agents_text = _read_text(agents_path) if agents_path.is_file() else ""
-    state = find_block(agents_text)
+    state = classify_block(agents_text)
     _write_text(agents_path, apply_block(agents_text, block))
     if state.state is BlockKind.ABSENT:
-        action = "appended"
+        action = BlockAction.APPENDED
     elif agents_created:
-        action = "filled from the template"
+        action = BlockAction.FILLED_FROM_TEMPLATE
     else:
-        action = "replaced"
-    return action, block + "\n"
+        action = BlockAction.REPLACED
+    return action, canonical_block_text(block)
 
 
 def _set_hooks_path(root, stdout):
@@ -637,5 +648,5 @@ def _print_report(stdout, headline, sections, block_action):
             print(f"  {name}", file=stdout)
         print("", file=stdout)
 
-    print(f"Kit block: {block_action} in AGENTS.md.", file=stdout)
+    print(f"Kit block: {block_action.value} in AGENTS.md.", file=stdout)
     print("Next: review and commit the changes.", file=stdout)

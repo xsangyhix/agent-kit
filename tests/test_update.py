@@ -132,7 +132,8 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(data["kit_version"], "0.2.0")
         self.assertEqual(data["files"], expected_files(payload))
         self.assertEqual(
-            data["agents_block"], sha256_text(block_content(payload) + "\n")
+            data["agents_block"],
+            sha256_text(installer.canonical_block_text(block_content(payload))),
         )
 
         self.assertIn("Updated agent-kit from 0.1.0 to 0.2.0.", stdout)
