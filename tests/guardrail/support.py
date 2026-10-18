@@ -84,15 +84,28 @@ def _run(command, cwd, env=None):
 def find_shell():
     """Return a POSIX shell, or None.
 
-    The hook is `sh`. Prefer one on PATH; on Windows, Git for Windows ships
-    `sh.exe`, so fall back to the Git installation itself. The hook cannot run
-    without a shell, so a test skips only when neither source yields one.
+    The hook is `sh`. On Windows, the WSL launcher answers to `bash` on `PATH`
+    but cannot run a Windows path, and without a distribution it exits 1 with a
+    message instead of running anything, so prefer the `sh.exe` Git for Windows
+    ships before consulting `PATH`. Everywhere else, prefer `PATH` and fall back
+    to the Git installation. The hook cannot run without a shell, so a test
+    skips only when no source yields one.
     """
+    if sys.platform == "win32":
+        found = _git_shell()
+        if found:
+            return found
+
     for name in ("sh", "bash"):
         found = shutil.which(name)
         if found:
             return found
 
+    return _git_shell()
+
+
+def _git_shell():
+    """Return the shell shipped with Git, or None."""
     git = shutil.which("git")
     if not git:
         return None
@@ -110,6 +123,22 @@ def find_shell():
         if candidate.exists():
             return str(candidate)
     return None
+
+
+def hook_path(shell, current):
+    """The PATH a hook run gets: the shell and the running interpreter first.
+
+    The hook resolves its own `python` when the throwaway repo has no `.venv`,
+    and the test runner does not put its interpreter on `PATH` (PyCharm does
+    not), so a hook test would otherwise reach the Windows Store alias.
+    """
+    return os.pathsep.join(
+        (
+            str(Path(shell).parent),
+            str(Path(sys.executable).parent),
+            current,
+        )
+    )
 
 
 class GitRepo:
@@ -191,8 +220,8 @@ class GitRepo:
             env[marker] = "1"
         # Git prepends its own bin folders to PATH when it runs a hook, so the
         # hook's `sh` call resolves. A test launches the hook directly, so give
-        # it the same reach by putting the shell's folder on PATH.
-        env["PATH"] = str(Path(shell).parent) + os.pathsep + env.get("PATH", "")
+        # it the same reach, plus the interpreter running the tests.
+        env["PATH"] = hook_path(shell, env.get("PATH", ""))
         return _run([shell, str(HOOK)], cwd=self.root, env=env)
 
 

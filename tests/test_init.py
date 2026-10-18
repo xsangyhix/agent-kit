@@ -18,6 +18,7 @@ from tests.guardrail.support import (
     block_content,
     copied_payload,
     find_shell,
+    hook_path,
     lock_data,
     read_text,
     sha256_file,
@@ -423,9 +424,7 @@ class InitTests(unittest.TestCase):
             for key, value in os.environ.items()
             if key not in AI_MARKERS
         }
-        environment["PATH"] = (
-            str(Path(shell).parent) + os.pathsep + environment.get("PATH", "")
-        )
+        environment["PATH"] = hook_path(shell, environment.get("PATH", ""))
         hook = self.root / ".agents" / "kit" / "hooks" / "pre-commit"
         result = subprocess.run(
             [shell, str(hook)],

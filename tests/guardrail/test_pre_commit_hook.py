@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from . import support
 
@@ -176,6 +177,29 @@ class HookSourceTests(unittest.TestCase):
         self.assertNotIn("src/server", hook)
         self.assertNotIn("build_release", hook)
         self.assertNotIn("scripts/", hook)
+
+
+class FindShellTests(unittest.TestCase):
+    """On Windows the WSL launcher must not be mistaken for a POSIX shell."""
+
+    def test_windows_prefers_gits_shell_over_a_bash_on_path(self):
+        stub = r"C:\Windows\System32\bash.exe"
+        with (
+            mock.patch.object(support.sys, "platform", "win32"),
+            mock.patch.object(
+                support, "_git_shell", return_value=r"C:\Git\usr\bin\sh.exe"
+            ),
+            mock.patch.object(support.shutil, "which", return_value=stub),
+        ):
+            self.assertEqual(support.find_shell(), r"C:\Git\usr\bin\sh.exe")
+
+    def test_a_posix_platform_still_prefers_a_shell_on_path(self):
+        with (
+            mock.patch.object(support.sys, "platform", "linux"),
+            mock.patch.object(support, "_git_shell", return_value="/git/sh"),
+            mock.patch.object(support.shutil, "which", return_value="/usr/bin/sh"),
+        ):
+            self.assertEqual(support.find_shell(), "/usr/bin/sh")
 
 
 if __name__ == "__main__":

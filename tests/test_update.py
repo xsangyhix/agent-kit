@@ -333,7 +333,9 @@ class UpdateTests(unittest.TestCase):
 
     def test_a_line_ending_change_only_is_not_a_local_change(self):
         path = self.root / ".agents/kit/workflow.md"
-        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        path.write_bytes(
+            path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        )
 
         code, stdout, stderr = self.run_update()
 
