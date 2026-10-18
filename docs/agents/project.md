@@ -16,6 +16,8 @@ Set `SKIP_PACKAGING_TEST=1` to skip the wheel build in `tests/test_packaging.py`
 
 `.agents/kit/` and `.agents/skills/` are this repo's **installed copy** of the kit. The source is `src/agent_kit/payload/`. Change the payload, then run `python -m agent_kit update` (with `PYTHONPATH=src`) to refresh the installed copy, and commit both.
 
+The sync check enforces that: `py -3.14 tools/check_payload_sync.py` compares the installed copy, the lock and the kit block with the payload, and `.agents/hooks.local/pre-commit` runs it on every commit. A green suite and a passing commit therefore both include it.
+
 ## Release
 
 The version lives in `src/agent_kit/__init__.py` and `pyproject.toml`; bump both together; the user tags `vX.Y.Z` on `dev`. Skills are refreshed with `python tools/refresh_skills.py <sha>`, never edited by hand.

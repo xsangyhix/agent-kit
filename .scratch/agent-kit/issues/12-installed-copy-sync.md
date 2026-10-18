@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -86,17 +86,17 @@ None.
 
 ## Acceptance criteria
 
-- [ ] `py -3.14 tools/check_payload_sync.py` on the clean repo exits 0 and prints nothing.
-- [ ] Every drift listed above is reported with the path and the reason, and exits 1: installed file modified, missing or extra; payload file edited after install; stale `harness.sh`; stale `kit_version`; unknown harness; block edited; `agents-block.md` edited after install.
-- [ ] A CRLF checkout still passes, and `__pycache__`/`*.pyc` files are ignored.
-- [ ] A missing installed folder, payload folder, lock, corrupt lock, missing `AGENTS.md` and marker-broken `AGENTS.md` each produce one line, with no traceback.
-- [ ] A run with drift leaves the working tree byte-identical.
-- [ ] `tests/test_payload_sync.py` covers the cases above and passes; the tests existed and failed before the implementation.
-- [ ] `.agents/hooks.local/pre-commit` exists, is POSIX `sh` with LF, is `100755` in the git index, and refuses a commit while drift is present and allows a clean one (probe recorded in the review).
-- [ ] `.gitattributes` contains `.agents/hooks.local/* text eol=lf`.
-- [ ] `docs/agents/project.md` names the sync check and the local hook; `GLOSSARY.md` defines **Sync check**.
-- [ ] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
-- [ ] `py -3.14 -m agent_kit update` (with `PYTHONPATH=src`) still reports no local changes and exits 0 afterwards, and does not touch `.agents/hooks.local/`.
+- [x] `py -3.14 tools/check_payload_sync.py` on the clean repo exits 0 and prints nothing.
+- [x] Every drift listed above is reported with the path and the reason, and exits 1: installed file modified, missing or extra; payload file edited after install; stale `harness.sh`; stale `kit_version`; unknown harness; block edited; `agents-block.md` edited after install.
+- [x] A CRLF checkout still passes, and `__pycache__`/`*.pyc` files are ignored.
+- [x] A missing installed folder, payload folder, lock, corrupt lock, missing `AGENTS.md` and marker-broken `AGENTS.md` each produce one line, with no traceback.
+- [x] A run with drift leaves the working tree byte-identical.
+- [x] `tests/test_payload_sync.py` covers the cases above and passes; the tests existed and failed before the implementation.
+- [x] `.agents/hooks.local/pre-commit` exists, is POSIX `sh` with LF, is `100755` in the git index, and refuses a commit while drift is present and allows a clean one (probe recorded in the review).
+- [x] `.gitattributes` contains `.agents/hooks.local/* text eol=lf`.
+- [x] `docs/agents/project.md` names the sync check and the local hook; `GLOSSARY.md` defines **Sync check**.
+- [x] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
+- [x] `py -3.14 -m agent_kit update` (with `PYTHONPATH=src`) still reports no local changes and exits 0 afterwards, and does not touch `.agents/hooks.local/`.
 
 ## Out of scope
 
@@ -105,3 +105,18 @@ None.
 - Checking project-owned files: `payload/templates/`, `docs/agents/project.md`, the rest of `.gitattributes`, `core.hooksPath`, `docs/adr/.gitkeep`, `.scratch/.gitkeep`.
 - Fixing the executable-bit problem for installed hooks in general; that is `agent-kit/11-kit-hook-executable-bit`, still open. This ticket only records its own local hook's mode.
 - Changing `agent-kit update`'s refusal behaviour or `--force`.
+
+## Review
+
+Submitted 2026-10-19.
+
+- TDD: `tests/test_payload_sync.py` was written first and failed with a missing `tools/check_payload_sync.py`; the implementation followed and the file now passes all 27 of its tests.
+- Full suite: `py -3.14 -m unittest discover -s tests -t . -v` — 165 tests, OK, 1 skipped (the POSIX mode-bit test on Windows).
+- Hook probe, run as an actual commit: with `.agents/kit/check_tracker.py` drifted, `git commit` exited 1 with:
+  ```
+    - .agents/kit/check_tracker.py (modified)
+    - .agents/kit.lock (.agents/kit/check_tracker.py hash does not match)
+  ```
+  After restoring the file, the commit passed. A direct run of `.agents/kit/hooks/pre-commit` also exited 0 on the clean tree.
+- The hook is `100755` in the index (`git ls-files -s`), is LF-only (no CRLF bytes), and `.gitattributes` carries `.agents/hooks.local/* text eol=lf`.
+- `PYTHONPATH=src py -3.14 -m agent_kit update` exited 0 and left `.agents/hooks.local/pre-commit` byte-identical.

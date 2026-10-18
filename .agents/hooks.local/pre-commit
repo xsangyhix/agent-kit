@@ -1,0 +1,4 @@
+#!/bin/sh
+# Project-specific pre-commit step for agent-kit.
+# The kit hook runs this last and exports PYTHON; see .agents/kit/hooks/pre-commit.
+"${PYTHON:-python}" tools/check_payload_sync.py

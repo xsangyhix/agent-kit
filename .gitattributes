@@ -1,3 +1,4 @@
 src/agent_kit/payload/kit/hooks/* text eol=lf
 *.sh text eol=lf
 .agents/kit/hooks/* text eol=lf
+.agents/hooks.local/* text eol=lf

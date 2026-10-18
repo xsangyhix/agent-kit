@@ -7,3 +7,4 @@ Canonical vocabulary for this project. Skills read this file first and use its t
 - **Payload** — the files under `src/agent_kit/payload/` that the tool installs into a project; the source of truth for everything the kit ships. _Avoid_: kit files, templates (they are one part of it).
 - **Installed copy** — `.agents/kit/` and `.agents/skills/` in this repo, produced from the payload by `agent-kit update`; never edited by hand.
 - **Skills snapshot** — the vendored copy of Matt Pocock's skills at a pinned commit, recorded in `UPSTREAM`. _Avoid_: skill library (the concept; the snapshot is the pinned copy).
+- **Sync check** — a comparison that proves the installed copy, the lock and the kit block are what the current payload produces; this repo runs it on every commit and in the test suite.
