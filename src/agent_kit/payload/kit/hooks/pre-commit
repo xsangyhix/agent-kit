@@ -1,0 +1,83 @@
+#!/bin/sh
+# Pre-commit guardrails installed by agent-kit.
+#
+# `agent-kit init` sets core.hooksPath to .agents/kit/hooks, so git runs this
+# file from the project root. Project-specific steps go in
+# .agents/hooks.local/pre-commit, which is never written by the kit.
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# 1. No commits on the protected branch from an agent session.
+#
+# An agent session is a shell owned by a coding-agent harness: the harness sets
+# the marker variables named in .agents/kit/harness.sh in every shell it starts.
+# The human's own shells -- a terminal, or the git child process PyCharm
+# launches -- carry none of them, so the human's release commit goes through
+# untouched.
+#
+# Presence is the only test. Matching a marker's *value* would silently disable
+# the guardrail the day the harness renames it, which is the failure this check
+# exists to prevent. Detection therefore fails open, so the hook prints the mode
+# it decided on for every protected-branch commit: a missing marker is visible,
+# not silent.
+#
+# The marker names come from the generated harness file. It is kit-owned and
+# may name a different harness, so read it rather than hard-coding the names.
+# A missing file is a visible failure too: warn, then fall back to the defaults.
+PROTECTED_BRANCH=dev
+
+if [ -f .agents/kit/harness.sh ]; then
+    . ./.agents/kit/harness.sh
+else
+    AGENT_MARKERS="AI_AGENT OPENCODE"
+    echo "Warning: .agents/kit/harness.sh is missing; using default agent markers: $AGENT_MARKERS."
+fi
+
+if [ "$branch" = "$PROTECTED_BRANCH" ]; then
+    for marker in $AGENT_MARKERS; do
+        eval "marker_value=\${$marker:-}"
+        if [ -n "$marker_value" ]; then
+            echo ""
+            echo "$PROTECTED_BRANCH commit mode: agent session ($marker is set). Refusing."
+            echo "  Agent work belongs on a branch:  git checkout -b agent/<feature-slug>"
+            echo ""
+            exit 1
+        fi
+    done
+
+    echo "$PROTECTED_BRANCH commit mode: human (none of $AGENT_MARKERS is set)."
+fi
+
+# 2. The issue tracker must itself be tracked.
+if git check-ignore -q .scratch; then
+    echo ""
+    echo "Refusing to commit: '.scratch' is gitignored, so the issue tracker is invisible to git."
+    echo "  Remove the '.scratch/' entry from .gitignore."
+    echo ""
+    exit 1
+fi
+
+# 3. Issue file invariants: status vocabulary, label vocabulary, close rules.
+# Resolve the interpreter once; the local hook reuses it.
+if [ -f "./.venv/Scripts/python.exe" ]; then
+    PYTHON=./.venv/Scripts/python.exe
+elif [ -f "./.venv/bin/python" ]; then
+    PYTHON=./.venv/bin/python
+elif python3 --version >/dev/null 2>&1; then
+    PYTHON=python3
+else
+    PYTHON=python
+fi
+
+"$PYTHON" .agents/kit/check_tracker.py || exit 1
+
+# 4. Project-specific steps, if this project has any. They see the interpreter
+# and branch the kit resolved, and their exit status is the hook's.
+if [ -f .agents/hooks.local/pre-commit ]; then
+    export PYTHON branch
+    sh .agents/hooks.local/pre-commit
+    local_status=$?
+    if [ "$local_status" -ne 0 ]; then
+        exit "$local_status"
+    fi
+fi
