@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -53,3 +53,48 @@ Test-Driven Development.
 
 - Check order on a broken block (agent-kit/14-init-force-checks-before-deleting).
 - Any other wording change.
+
+## Review
+
+Implementation complete, submitted for review.
+
+### Summary of changes
+
+- `src/agent_kit/installer.py`: `confirm_deletion` gained an optional
+  `replaces_block=False` keyword. Paths keep the current heading and prompt; a
+  changed or missing block adds `The kit block in AGENTS.md will be replaced.`
+  after them. With no paths, the heading is omitted and the prompt becomes
+  `Type 'yes' to continue: `. `update --force` removes `AGENTS.md` from the
+  deletion list and passes the block flag instead of listing it as a deletion.
+  The positional signature and `init`'s call are unchanged.
+- `tests/test_update.py`: four `--force` cases written first and seen fail
+  against the old code: paths plus block, edited block only, missing markers
+  only, and a declined block-only confirmation. The `edit_block` helper edits
+  the block in place.
+- `README.md`: the `--force` section now records both forms and states that
+  `update` never deletes `AGENTS.md`.
+
+### Verification
+
+The four new tests failed before the change with `AGENTS.md` under the deletion
+heading, then passed. Full suite:
+
+```
+py -3.14 -m unittest discover -s tests -t . -v
+Ran 137 tests in 115.707s
+OK (skipped=1)
+```
+
+The skip is the pre-existing Windows case, `test_the_installed_hook_keeps_its_mode_on_disk`.
+`.agents/kit/check_tracker.py` exits 0.
+
+### Judgement calls
+
+- **Missing markers use the same line.** The ticket asks for the block line when
+  the markers are missing, even though `update` appends a block there rather
+  than replacing one; the wording follows the ticket verbatim.
+- **Missing kit files stay in the deletion list.** The ticket is about
+  `AGENTS.md`, which update never deletes. A missing kit-owned file sits under a
+  folder that is removed and rewritten, so it is still listed; no other wording
+  changed.
+

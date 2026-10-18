@@ -34,8 +34,12 @@ def payload_root():
     return Path(__file__).parent / "payload"
 
 
-def confirm_deletion(paths, stdin, stdout):
-    """Ask for a typed confirmation before --force deletes anything."""
+def confirm_deletion(paths, stdin, stdout, replaces_block=False):
+    """Ask for a typed confirmation before --force deletes anything.
+
+    Only paths that update or init will really delete are listed. A changed
+    or missing kit block is not a deletion, so it gets a line of its own.
+    """
     if not stdin.isatty():
         print(
             "Refusing --force: it needs a confirmation typed at an interactive terminal.",
@@ -43,10 +47,16 @@ def confirm_deletion(paths, stdin, stdout):
         )
         return False
 
-    print("These paths will be deleted:", file=stdout)
-    for path in paths:
-        print(path, file=stdout)
-    stdout.write("Type 'yes' to delete them and continue: ")
+    if paths:
+        print("These paths will be deleted:", file=stdout)
+        for path in paths:
+            print(path, file=stdout)
+    if replaces_block:
+        print("The kit block in AGENTS.md will be replaced.", file=stdout)
+    if paths:
+        stdout.write("Type 'yes' to delete them and continue: ")
+    else:
+        stdout.write("Type 'yes' to continue: ")
     stdout.flush()
     answer = stdin.readline()
     if answer.strip() == "yes":
@@ -326,7 +336,11 @@ def update(root, force, stdin, stdout, payload=None):
         return 1
 
     if changes:
-        if not confirm_deletion([path for path, _ in changes], stdin, stdout):
+        deletions = [path for path, _ in changes if path != AGENTS]
+        replaces_block = any(path == AGENTS for path, _ in changes)
+        if not confirm_deletion(
+            deletions, stdin, stdout, replaces_block=replaces_block
+        ):
             return 1
 
     # The checks are done; replace the kit-owned folders.

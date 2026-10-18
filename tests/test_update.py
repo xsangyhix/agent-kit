@@ -101,6 +101,14 @@ class UpdateTests(unittest.TestCase):
         block.write_bytes(block.read_bytes() + b"\nA new kit line.\n")
         return payload
 
+    def edit_block(self):
+        """Edit a line inside AGENTS.md's kit block."""
+        path = self.root / "AGENTS.md"
+        text = path.read_text("utf-8").replace(
+            BEGIN + "\n", BEGIN + "\nedited\n", 1
+        )
+        path.write_text(text, encoding="utf-8")
+
     def assert_unchanged(self, before):
         self.assertEqual(snapshot(self.root), before)
 
@@ -440,6 +448,71 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("These paths will be deleted:", stdout)
         self.assertIn(".agents/kit/workflow.md", stdout)
+        self.assertIn("Aborted. Nothing was changed.", stdout)
+        self.assert_unchanged(before)
+
+    def test_force_lists_only_deletions_before_the_block_line(self):
+        path = self.root / ".agents/kit/workflow.md"
+        path.write_bytes(path.read_bytes() + b"local edit\n")
+        self.edit_block()
+
+        code, stdout, _ = self.run_update(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 0, stdout)
+        self.assertIn(
+            "These paths will be deleted:\n"
+            ".agents/kit/workflow.md\n"
+            "The kit block in AGENTS.md will be replaced.\n"
+            "Type 'yes' to delete them and continue: ",
+            stdout,
+        )
+
+    def test_force_with_only_an_edited_block_asks_without_a_deletion_heading(
+        self,
+    ):
+        self.edit_block()
+
+        code, stdout, _ = self.run_update(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 0, stdout)
+        self.assertIn(
+            "The kit block in AGENTS.md will be replaced.\n"
+            "Type 'yes' to continue: ",
+            stdout,
+        )
+        self.assertNotIn("These paths will be deleted:", stdout)
+
+    def test_force_with_only_missing_markers_asks_without_a_deletion_heading(
+        self,
+    ):
+        self.repo.write("AGENTS.md", "project text only\n")
+
+        code, stdout, _ = self.run_update(
+            force=True, stdin=FakeStdin("yes\n", tty=True)
+        )
+
+        self.assertEqual(code, 0, stdout)
+        self.assertIn(
+            "The kit block in AGENTS.md will be replaced.\n"
+            "Type 'yes' to continue: ",
+            stdout,
+        )
+        self.assertNotIn("These paths will be deleted:", stdout)
+
+    def test_force_with_only_a_block_change_aborts_cleanly(self):
+        self.edit_block()
+        before = snapshot(self.root)
+
+        code, stdout, _ = self.run_update(
+            force=True, stdin=FakeStdin("no\n", tty=True)
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("The kit block in AGENTS.md will be replaced.", stdout)
         self.assertIn("Aborted. Nothing was changed.", stdout)
         self.assert_unchanged(before)
 

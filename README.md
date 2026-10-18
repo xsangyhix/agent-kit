@@ -169,12 +169,30 @@ missing lock or a folder that is not a git root.
 files in the two kit-owned folders; for `update` it discards the changed, deleted, or
 extra kit-owned files.
 
-It never deletes silently. It lists the paths and asks for a typed confirmation:
+It never deletes silently. It lists the paths it will really delete and asks for a
+typed confirmation:
 
 ```
 These paths will be deleted:
 ...
 Type 'yes' to delete them and continue:
+```
+
+`update` never deletes `AGENTS.md`; it only rewrites the kit block. A changed or
+missing block is therefore reported on a line of its own, after the paths, if any:
+
+```
+These paths will be deleted:
+...
+The kit block in AGENTS.md will be replaced.
+Type 'yes' to delete them and continue:
+```
+
+When only the block changed, there is no deletion heading and no empty list:
+
+```
+The kit block in AGENTS.md will be replaced.
+Type 'yes' to continue:
 ```
 
 Only the exact answer `yes` continues. Anything else prints `Aborted. Nothing was
