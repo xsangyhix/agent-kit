@@ -92,7 +92,7 @@ Sections:
 
 1. **Never touch `dev`.** Work only on your own branch; a pre-commit hook refuses an agent session's commit on `dev`. Before your first edit, confirm the branch: if you are not on your own branch, stop and ask.
 2. **Branch naming**: `agent/<feature-slug>`, branched off `dev`, where feature-slug is the `.scratch/<feature>/` directory name. Use `agent/<NN>-<slug>` only when tickets within one effort run in parallel.
-3. **Commits**: you decide, but each commit is small and logical. Stage everything the commit is to carry, and read the staged set back before you commit: unstaged content is not in the commit, and a file edited after it was staged is committed in its earlier form.
+3. **Commits**: you decide, but each commit is small and logical. Stage everything the commit is to carry, and read the staged set back before you commit: unstaged content is not in the commit, and a file edited after it was staged is committed in its earlier form. Every commit also ends with a `Ticket:` trailer naming the ticket it implements, using the identifier from rule 13, so the link survives the ticket file moving to `issues/closed/`; a commit that implements no ticket — such as an out-of-ticket change the user asked for — carries `Ticket: none`. The user decided the trailer convention on 2026-10-18, outside the ticket flow.
 4. **English**: everywhere — replies, commit messages, issue files.
 5. **Push**: not required; the user handles pushing.
 6. **Tests**: Test-Driven Development only. The project's test command is in `docs/agents/project.md`.
