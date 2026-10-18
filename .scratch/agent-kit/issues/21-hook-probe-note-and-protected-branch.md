@@ -44,5 +44,5 @@ None.
 ## Out of scope
 
 - Making the protected branch configurable (design §13).
-- The executable bit of the installed hook (agent-kit/11-kit-hook-executable-bit, in rc-machines).
+- The executable bit of the installed hook (agent-kit/11-kit-hook-executable-bit).
 - Changing rc-machines' local hook (agent-kit/22-rc-machines-takes-the-kit-fixes).

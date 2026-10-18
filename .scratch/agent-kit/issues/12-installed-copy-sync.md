@@ -103,5 +103,5 @@ None.
 - Running the check from the kit-owned `.agents/kit/hooks/pre-commit`, from `init`/`update`, or in another project. The kit hook sees no payload and must stay project-agnostic.
 - CI; the repo has none.
 - Checking project-owned files: `payload/templates/`, `docs/agents/project.md`, the rest of `.gitattributes`, `core.hooksPath`, `docs/adr/.gitkeep`, `.scratch/.gitkeep`.
-- Fixing the executable-bit problem for installed hooks in general; that is `agent-kit/11-kit-hook-executable-bit` in rc-machines, still open. This ticket only records its own local hook's mode.
+- Fixing the executable-bit problem for installed hooks in general; that is `agent-kit/11-kit-hook-executable-bit`, still open. This ticket only records its own local hook's mode.
 - Changing `agent-kit update`'s refusal behaviour or `--force`.
