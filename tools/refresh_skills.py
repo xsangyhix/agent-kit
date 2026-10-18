@@ -15,6 +15,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -77,8 +78,8 @@ def main(argv=None, *, target=None):
 
 def refresh(sha, target, archive=None):
     """Write a validated snapshot to target and return the number of skills."""
-    target.parent.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix=".refresh-skills-", dir=target.parent))
+    work = Path(tempfile.mkdtemp(prefix="refresh-skills-"))
+    staging = None
     try:
         source_archive = archive
         if source_archive is None:
@@ -87,15 +88,22 @@ def refresh(sha, target, archive=None):
 
         extracted = work / "extracted"
         extracted.mkdir()
-        top = extract(sha, source_archive, extracted)
+        source = extract(source_archive, extracted)
 
-        staging = work / "skills"
-        build(sha, extracted, top, staging)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
+        build(sha, source, staging)
+        count = count_skills(staging)
 
-        remove_target(target)
-        staging.replace(target)
-        return count_skills(target)
+        try:
+            replace_target(staging, target)
+        except OSError as exc:
+            raise RefreshError(f"could not replace {target}: {exc}") from exc
+        staging = None
+        return count
     finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
         shutil.rmtree(work, ignore_errors=True)
 
 
@@ -109,8 +117,8 @@ def download(sha, destination):
         raise RefreshError(f"could not download {url}: {exc}") from exc
 
 
-def extract(sha, archive, destination):
-    """Extract a validated archive and return its single top-level folder name."""
+def extract(archive, destination):
+    """Extract a validated archive and return its top-level folder path."""
     try:
         with tarfile.open(archive, "r:gz") as tar:
             members = tar.getmembers()
@@ -125,7 +133,7 @@ def extract(sha, archive, destination):
     for category in CATEGORIES:
         if not (top_dir / "skills" / category).is_dir():
             raise RefreshError(f"archive has no skills/{category}/ folder")
-    return top
+    return top_dir
 
 
 def validate_members(members):
@@ -150,10 +158,7 @@ def is_unsafe(name):
     return ".." in name.replace("\\", "/").split("/")
 
 
-def build(sha, extracted, top, staging):
-    source = extracted / top
-    staging.mkdir()
-
+def build(sha, source, staging):
     def ignore(directory, names):
         base = Path(directory)
         ignored = []
@@ -184,6 +189,22 @@ def build(sha, extracted, top, staging):
         raise RefreshError(f"snapshot would have markdown at its root: {listed}")
 
 
+def replace_target(staging, target):
+    """Swap staging into place, restoring the previous snapshot if the swap fails."""
+    backup = None
+    if target.exists() or target.is_symlink():
+        backup = target.parent / f".{target.name}.old-{uuid.uuid4().hex}"
+        target.rename(backup)
+    try:
+        staging.rename(target)
+    except OSError:
+        if backup is not None and not target.exists():
+            backup.rename(target)
+        raise
+    if backup is not None:
+        remove_target(backup)
+
+
 def remove_target(target):
     if target.is_dir() and not target.is_symlink():
         shutil.rmtree(target)
@@ -192,7 +213,7 @@ def remove_target(target):
 
 
 def count_skills(root):
-    return sum(1 for path in root.rglob("SKILL.md") if path.is_file())
+    return len({path.parent for path in root.rglob("SKILL.md") if path.is_file()})
 
 
 if __name__ == "__main__":

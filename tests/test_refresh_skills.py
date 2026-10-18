@@ -108,7 +108,7 @@ class RefreshSkillsTests(unittest.TestCase):
         self.target.mkdir(parents=True)
         (self.target / "sentinel.txt").write_text("keep me\n")
 
-    def assert_refused(self, word):
+    def assert_archive_refused(self, word):
         code, stdout, stderr = self.run_tool(["--archive", str(self.archive), SHA])
 
         self.assertEqual(code, 1)
@@ -124,7 +124,7 @@ class RefreshSkillsTests(unittest.TestCase):
         self.write_archive(members)
         self.prepare_existing_payload()
 
-        self.assert_refused("LICENSE")
+        self.assert_archive_refused("LICENSE")
 
     def test_archive_without_a_category_is_refused(self):
         members = {
@@ -135,7 +135,7 @@ class RefreshSkillsTests(unittest.TestCase):
         self.write_archive(members)
         self.prepare_existing_payload()
 
-        self.assert_refused("in-progress")
+        self.assert_archive_refused("in-progress")
 
     def test_member_with_parent_traversal_is_refused(self):
         members = self.standard_members()
@@ -143,7 +143,7 @@ class RefreshSkillsTests(unittest.TestCase):
         self.write_archive(members)
         self.prepare_existing_payload()
 
-        self.assert_refused("..")
+        self.assert_archive_refused("..")
 
     def test_absolute_member_is_refused(self):
         members = self.standard_members()
@@ -151,7 +151,7 @@ class RefreshSkillsTests(unittest.TestCase):
         self.write_archive(members)
         self.prepare_existing_payload()
 
-        self.assert_refused("unsafe path")
+        self.assert_archive_refused("unsafe path")
 
     def test_members_from_two_top_folders_are_refused(self):
         members = self.standard_members()
@@ -159,4 +159,4 @@ class RefreshSkillsTests(unittest.TestCase):
         self.write_archive(members)
         self.prepare_existing_payload()
 
-        self.assert_refused("top-level folder")
+        self.assert_archive_refused("top-level folder")
