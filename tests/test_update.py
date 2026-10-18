@@ -1,10 +1,8 @@
 """Tests for the update command (design §9)."""
 
 import contextlib
-import hashlib
 import io
 import json
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -12,12 +10,16 @@ from pathlib import Path
 from unittest import mock
 
 from agent_kit import installer
-from tests.guardrail.support import GitRepo
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-PAYLOAD = REPO_ROOT / "src" / "agent_kit" / "payload"
-KIT_PAYLOAD = PAYLOAD / "kit"
-SKILLS_PAYLOAD = PAYLOAD / "skills"
+from tests.guardrail.support import (
+    FakeStdin,
+    GitRepo,
+    block_content,
+    copied_payload,
+    lock_data,
+    read_text,
+    sha256_file,
+    sha256_text,
+)
 
 BEGIN = "<!-- agent-kit:begin -->"
 END = "<!-- agent-kit:end -->"
@@ -26,24 +28,6 @@ HARNESS_SH = (
     'AGENT_MARKERS="AI_AGENT OPENCODE"\n'
 )
 LOCK = ".agents/kit.lock"
-
-
-def sha256_text(text):
-    return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
-
-
-def sha256_file(path):
-    return hashlib.sha256(
-        Path(path).read_bytes().replace(b"\r\n", b"\n")
-    ).hexdigest()
-
-
-def read_text(path):
-    return Path(path).read_text(encoding="utf-8")
-
-
-def block_content(payload=PAYLOAD):
-    return (payload / "agents-block.md").read_text(encoding="utf-8").rstrip("\n")
 
 
 def expected_files(payload):
@@ -72,15 +56,6 @@ def snapshot(root):
             continue
         result[relative.as_posix()] = path.read_bytes()
     return result
-
-
-class FakeStdin(io.StringIO):
-    def __init__(self, text="", tty=False):
-        super().__init__(text)
-        self.tty = tty
-
-    def isatty(self):
-        return self.tty
 
 
 class UpdateTests(unittest.TestCase):
@@ -128,16 +103,9 @@ class UpdateTests(unittest.TestCase):
                     )
         return code, stdout.getvalue(), stderr.getvalue()
 
-    def copied_payload(self):
-        folder = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, folder, True)
-        target = folder / "payload"
-        shutil.copytree(PAYLOAD, target)
-        return target
-
     def newer_payload(self):
         """A payload with one file changed, one added and one removed."""
-        payload = self.copied_payload()
+        payload = copied_payload(self)
         changed = payload / "kit" / "workflow.md"
         changed.write_bytes(changed.read_bytes() + b"\nNew rule.\n")
         (payload / "kit" / "new-file.txt").write_bytes(b"new\n")
@@ -145,9 +113,6 @@ class UpdateTests(unittest.TestCase):
         block = payload / "agents-block.md"
         block.write_bytes(block.read_bytes() + b"\nA new kit line.\n")
         return payload
-
-    def lock_data(self):
-        return json.loads((self.root / LOCK).read_text("utf-8"))
 
     def assert_unchanged(self, before):
         self.assertEqual(snapshot(self.root), before)
@@ -168,7 +133,7 @@ class UpdateTests(unittest.TestCase):
         self.assertTrue((self.root / ".agents/kit/new-file.txt").is_file())
         self.assertFalse((self.root / ".agents/kit/triage-labels.md").exists())
 
-        data = self.lock_data()
+        data = lock_data(self.root)
         self.assertEqual(data["kit_version"], "0.2.0")
         self.assertEqual(data["files"], expected_files(payload))
         self.assertEqual(
@@ -251,7 +216,7 @@ class UpdateTests(unittest.TestCase):
         self.assert_unchanged(before)
 
     def test_an_unknown_harness_in_the_lock_is_a_usage_error(self):
-        data = self.lock_data()
+        data = lock_data(self.root)
         data["harness"] = "claude"
         (self.root / LOCK).write_text(json.dumps(data), encoding="utf-8")
         before = snapshot(self.root)
@@ -410,7 +375,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(code, 0, stdout + stderr)
         self.assertNotIn(b"local edit", path.read_bytes())
         self.assertEqual(path.read_bytes(), (payload / "kit/workflow.md").read_bytes())
-        self.assertEqual(self.lock_data()["kit_version"], "0.2.0")
+        self.assertEqual(lock_data(self.root)["kit_version"], "0.2.0")
         self.assertIn("Updated agent-kit from 0.1.0 to 0.2.0.", stdout)
 
 

@@ -1,10 +1,16 @@
-"""Helpers that give each guardrail test its own throwaway git repository.
+"""Shared support for the test suite.
+
+The guardrail tests get a throwaway git repository; the installer tests use the
+same repository plus helpers that build payload fixtures and hashes.
 
 Nothing here mocks git or imports the scripts under test: a test writes files
 into a temporary repo, stages them, and runs the real script as a subprocess.
 That is the same path the pre-commit hook takes.
 """
 
+import hashlib
+import io
+import json
 import os
 import shutil
 import subprocess
@@ -13,6 +19,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PAYLOAD = REPO_ROOT / "src" / "agent_kit" / "payload"
 CHECKER = REPO_ROOT / "src" / "agent_kit" / "payload" / "kit" / "check_tracker.py"
 HOOK = REPO_ROOT / "src" / "agent_kit" / "payload" / "kit" / "hooks" / "pre-commit"
 
@@ -20,6 +27,46 @@ HOOK = REPO_ROOT / "src" / "agent_kit" / "payload" / "kit" / "hooks" / "pre-comm
 # from every test's environment, because the test run itself may be an agent
 # session, and then set again only for the cases that call for them.
 AI_MARKERS = ("AI_AGENT", "OPENCODE")
+
+
+def sha256_text(text):
+    return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
+def sha256_file(path):
+    return hashlib.sha256(
+        Path(path).read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
+
+
+def read_text(path):
+    return Path(path).read_text(encoding="utf-8")
+
+
+def block_content(payload=PAYLOAD):
+    return (Path(payload) / "agents-block.md").read_text(encoding="utf-8").rstrip("\n")
+
+
+def lock_data(root):
+    return json.loads((Path(root) / ".agents" / "kit.lock").read_text("utf-8"))
+
+
+def copied_payload(test_case, payload=PAYLOAD):
+    """Copy the payload into a temporary folder, cleaned up with the test."""
+    folder = Path(tempfile.mkdtemp())
+    test_case.addCleanup(shutil.rmtree, folder, True)
+    target = folder / "payload"
+    shutil.copytree(payload, target)
+    return target
+
+
+class FakeStdin(io.StringIO):
+    def __init__(self, text="", tty=False):
+        super().__init__(text)
+        self.tty = tty
+
+    def isatty(self):
+        return self.tty
 
 
 def _run(command, cwd, env=None):
@@ -133,3 +180,11 @@ class GitRepo:
         # it the same reach by putting the shell's folder on PATH.
         env["PATH"] = str(Path(shell).parent) + os.pathsep + env.get("PATH", "")
         return _run([shell, str(HOOK)], cwd=self.root, env=env)
+
+
+def make_repo(test_case, branch):
+    """A GitRepo with the hook fixtures, cleaned up with the test case."""
+    repo = GitRepo(branch)
+    test_case.addCleanup(repo.close)
+    repo.add_hook_fixtures()
+    return repo

@@ -5,21 +5,30 @@ import hashlib
 import io
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 from agent_kit import installer, lock
-from tests.guardrail.support import AI_MARKERS, GitRepo, find_shell
+from tests.guardrail.support import (
+    AI_MARKERS,
+    FakeStdin,
+    GitRepo,
+    block_content,
+    copied_payload,
+    find_shell,
+    lock_data,
+    read_text,
+    sha256_file,
+    sha256_text,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PAYLOAD = REPO_ROOT / "src" / "agent_kit" / "payload"
 KIT_PAYLOAD = PAYLOAD / "kit"
 SKILLS_PAYLOAD = PAYLOAD / "skills"
 TEMPLATES = PAYLOAD / "templates"
-AGENTS_BLOCK = PAYLOAD / "agents-block.md"
 
 BEGIN = "<!-- agent-kit:begin -->"
 END = "<!-- agent-kit:end -->"
@@ -31,33 +40,6 @@ HARNESS_SH = (
 GITATTRIBUTES_LINE = ".agents/kit/hooks/* text eol=lf"
 
 TEMPLATE_NAMES = ("AGENTS.md", "GLOSSARY.md", "docs/agents/project.md")
-
-
-def sha256_text(text):
-    return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
-
-
-def sha256_file(path):
-    return hashlib.sha256(
-        Path(path).read_bytes().replace(b"\r\n", b"\n")
-    ).hexdigest()
-
-
-def block_content():
-    return AGENTS_BLOCK.read_text(encoding="utf-8").rstrip("\n")
-
-
-def read_text(path):
-    return Path(path).read_text(encoding="utf-8")
-
-
-class FakeStdin(io.StringIO):
-    def __init__(self, text="", tty=False):
-        super().__init__(text)
-        self.tty = tty
-
-    def isatty(self):
-        return self.tty
 
 
 class InitTests(unittest.TestCase):
@@ -85,16 +67,6 @@ class InitTests(unittest.TestCase):
         self.assertEqual(code, 0, stdout + stderr)
         self.assertEqual(stderr, "")
         return stdout
-
-    def lock_data(self):
-        return json.loads((self.root / ".agents" / "kit.lock").read_text("utf-8"))
-
-    def copied_payload(self):
-        folder = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, folder, True)
-        target = folder / "payload"
-        shutil.copytree(PAYLOAD, target)
-        return target
 
     def assert_nothing_written(self):
         self.assertFalse((self.root / ".agents" / "kit").exists())
@@ -125,7 +97,7 @@ class InitTests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), source.read_bytes())
 
     def test_fresh_repo_does_not_copy_bytecode_caches(self):
-        payload = self.copied_payload()
+        payload = copied_payload(self)
         cache = payload / "kit" / "__pycache__"
         cache.mkdir()
         (cache / "check_tracker.cpython-314.pyc").write_bytes(b"cache\n")
@@ -137,7 +109,7 @@ class InitTests(unittest.TestCase):
         self.assertFalse((self.root / ".agents/kit/stray.pyc").exists())
         self.assertNotIn(
             ".agents/kit/__pycache__/check_tracker.cpython-314.pyc",
-            self.lock_data()["files"],
+            lock_data(self.root)["files"],
         )
 
     def test_fresh_repo_writes_the_harness_file(self):
@@ -211,13 +183,13 @@ class InitTests(unittest.TestCase):
                 expected[".agents/skills/" + relative] = sha256_file(source)
         expected[".agents/kit/harness.sh"] = sha256_text(HARNESS_SH)
 
-        data = self.lock_data()
+        data = lock_data(self.root)
         self.assertEqual(data["files"], expected)
 
     def test_the_lock_records_the_version_harness_and_block_hash(self):
         self.install()
 
-        data = self.lock_data()
+        data = lock_data(self.root)
         self.assertEqual(data["kit_version"], "0.1.0")
         self.assertEqual(data["harness"], "opencode")
         self.assertEqual(data["agents_block"], sha256_text(block_content() + "\n"))
