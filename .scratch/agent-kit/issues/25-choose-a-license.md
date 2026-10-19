@@ -23,7 +23,7 @@ None.
 ## Questions
 
 1. Which license should the kit's own files carry? (MIT, Apache-2.0, or another)
-   - Answer:
+   - Answer: MIT, `Copyright (c) 2026 Marcin Słoń`.
 
 ## Out of scope
 
