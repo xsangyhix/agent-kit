@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -41,12 +41,12 @@ None.
 
 ## Acceptance criteria
 
-- [ ] `README.md`'s "Maintaining the kit" section contains the ordered procedure listed in the Description, including the harness-neutral sentence and the `vX.Y.Z` tag step.
-- [ ] `docs/agents/project.md`'s Release section keeps its short rule and points at the README procedure instead of duplicating it.
-- [ ] `tests/test_cli.py` and `tests/test_init.py` contain no `0.1.0` literal; they use `agent_kit.__version__`.
-- [ ] A test asserts that `pyproject.toml`'s `version` equals `agent_kit.__version__`, and fails when either is changed alone.
-- [ ] `tests/test_changelog.py` still pins the changelog heading, and the procedure says to update it.
-- [ ] The whole suite passes and `py -3.14 tools/check_payload_sync.py` exits 0.
+- [x] `README.md`'s "Maintaining the kit" section contains the ordered procedure listed in the Description, including the harness-neutral sentence and the `vX.Y.Z` tag step.
+- [x] `docs/agents/project.md`'s Release section keeps its short rule and points at the README procedure instead of duplicating it.
+- [x] `tests/test_cli.py` and `tests/test_init.py` contain no `0.1.0` literal; they use `agent_kit.__version__`.
+- [x] A test asserts that `pyproject.toml`'s `version` equals `agent_kit.__version__`, and fails when either is changed alone.
+- [x] `tests/test_changelog.py` still pins the changelog heading, and the procedure says to update it.
+- [x] The whole suite passes and `py -3.14 tools/check_payload_sync.py` exits 0.
 
 ## Out of scope
 
