@@ -3,7 +3,7 @@ import io
 import tempfile
 import unittest
 
-from agent_kit import cli
+from agent_kit import __version__, cli
 
 
 class CliTests(unittest.TestCase):
@@ -18,7 +18,7 @@ class CliTests(unittest.TestCase):
         code, stdout, stderr = self.run_main(["--version"])
 
         self.assertEqual(code, 0)
-        self.assertEqual(stdout, "agent-kit 0.1.0\n")
+        self.assertEqual(stdout, f"agent-kit {__version__}\n")
         self.assertEqual(stderr, "")
 
     def test_init_is_wired_to_the_installer(self):

@@ -20,7 +20,7 @@ The sync check enforces that: `py -3.14 tools/check_payload_sync.py` compares th
 
 ## Release
 
-The version lives in `src/agent_kit/__init__.py` and `pyproject.toml`; bump both together; the user tags `vX.Y.Z` on `dev`. Skills are refreshed with `python tools/refresh_skills.py <sha>`, never edited by hand.
+The bump procedure is in `README.md` under "Maintaining the kit"; it names the files to change, the changelog entry, the installed-copy refresh and the sync check. The user tags `vX.Y.Z` on `dev`. Skills are refreshed with `python tools/refresh_skills.py <sha>`, never edited by hand.
 
 ## ADR numbering
 

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_kit import installer, lock
+from agent_kit import __version__, installer, lock
 from tests.guardrail.support import (
     AI_MARKERS,
     FakeStdin,
@@ -192,7 +192,7 @@ class InitTests(unittest.TestCase):
         self.install()
 
         data = lock_data(self.root)
-        self.assertEqual(data["kit_version"], "0.1.0")
+        self.assertEqual(data["kit_version"], __version__)
         self.assertEqual(data["harness"], "opencode")
         self.assertEqual(
             data["agents_block"],
@@ -210,7 +210,7 @@ class InitTests(unittest.TestCase):
     def test_the_summary_reports_the_install(self):
         stdout = self.install()
 
-        self.assertIn("agent-kit 0.1.0", stdout)
+        self.assertIn(f"agent-kit {__version__}", stdout)
         self.assertIn("opencode", stdout)
         self.assertIn("Created:", stdout)
         self.assertIn("Kit block:", stdout)
@@ -465,7 +465,7 @@ class InitTests(unittest.TestCase):
                     "agents_block": "x",
                     "files": {},
                     "harness": "opencode",
-                    "kit_version": "0.1.0",
+                    "kit_version": __version__,
                 }
             ),
         )
@@ -474,7 +474,7 @@ class InitTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
         self.assertIn("already installed", stderr)
-        self.assertIn("0.1.0", stderr)
+        self.assertIn(__version__, stderr)
 
     def test_a_conflict_without_force_is_refused_and_writes_nothing(self):
         conflict = self.repo.write(".agents/skills/demo/SKILL.md", b"mine\n")
@@ -629,7 +629,7 @@ class LockTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             lock.write_lock(
                 folder,
-                "0.1.0",
+                __version__,
                 "opencode",
                 {"b/file": "bbb", "a/file": "aaa"},
                 "block",
@@ -645,7 +645,7 @@ class LockTests(unittest.TestCase):
                         "agents_block": "block",
                         "files": {"a/file": "aaa", "b/file": "bbb"},
                         "harness": "opencode",
-                        "kit_version": "0.1.0",
+                        "kit_version": __version__,
                     },
                     indent=2,
                     sort_keys=True,

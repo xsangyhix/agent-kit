@@ -258,9 +258,32 @@ py -3.14 -m unittest discover -s tests -t . -v
 It may need network access for the build's isolated environment and can be skipped with
 the `SKIP_PACKAGING_TEST` environment variable set.
 
-Bump the version in both `src/agent_kit/__init__.py` and `pyproject.toml`, then commit.
-The user tags `vX.Y.Z` on `dev` after merging; the tool reads its version from
-`src/agent_kit/__init__.py`.
+### Bumping the version
+
+The version lives in two files, and both change together; a test fails when they
+disagree.
+
+1. Set the new version in `src/agent_kit/__init__.py` and `pyproject.toml`.
+2. Add a `CHANGELOG.md` entry under a new `## [X.Y.Z] - YYYY-MM-DD` heading and update
+   `VERSION_HEADING` in `tests/test_changelog.py` to match. `CHANGELOG.md` states the
+   SemVer policy.
+3. Run the suite.
+4. Refresh this repo's installed copy from the repository root with `PYTHONPATH=src`,
+   so `.agents/kit.lock` records the new `kit_version`:
+
+   ```
+   py -3.14 -m agent_kit update
+   ```
+
+   On PowerShell, set `$env:PYTHONPATH = "src"` first.
+5. Run `py -3.14 tools/check_payload_sync.py`.
+6. Commit. The user merges `agent/<feature-slug>` into `dev` and tags `vX.Y.Z` there;
+   the tool reads its version from `src/agent_kit/__init__.py`.
+7. Verify `agent-kit --version` reports the new version.
+
+A bump is harness-neutral: `src/agent_kit/harness.py` only selects the skills folder
+and the agent markers, and `installer` records the harness name in the lock's
+`harness` field. Nothing about the version changes with the harness.
 
 To refresh the vendored skill library, from the repository root:
 
