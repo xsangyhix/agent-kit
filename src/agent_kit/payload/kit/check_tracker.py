@@ -62,23 +62,22 @@ def staged_tracker_files():
             yield name
 
 
+def read_header_field(lines, field):
+    """Return the value of ``<field>:`` from header lines, or ``None``."""
+    for line in lines:
+        match = re.match(rf"^{field}:\s*(.+?)\s*$", line)
+        if match:
+            return match.group(1)
+    return None
+
+
 def parse_header(text):
     """Return the ``Status:`` and ``Labels:`` values from a file's header."""
-    status = None
-    labels = None
-    for line in text.splitlines()[:HEADER_LINES]:
-        if status is None:
-            match = re.match(r"^Status:\s*(.+?)\s*$", line)
-            if match:
-                status = match.group(1)
-        if labels is None:
-            match = re.match(r"^Labels:\s*(.+?)\s*$", line)
-            if match:
-                labels = match.group(1)
-    return status, labels
+    lines = text.splitlines()[:HEADER_LINES]
+    return read_header_field(lines, "Status"), read_header_field(lines, "Labels")
 
 
-def check(name, status, labels, problems):
+def check(name, status, label, problems):
     closed = CLOSED_MARKER in name
 
     if status is None:
@@ -89,9 +88,9 @@ def check(name, status, labels, problems):
             f"(expected one of: {', '.join(STATES)})"
         )
 
-    if labels is not None and labels not in LABELS:
+    if label is not None and label not in LABELS:
         problems.append(
-            f"{name}: unknown label '{labels}' "
+            f"{name}: unknown label '{label}' "
             f"(expected one of: {', '.join(LABELS)})"
         )
 
@@ -100,10 +99,10 @@ def check(name, status, labels, problems):
             problems.append(
                 f"{name}: lives in issues/closed/ but is '{status}' (expected 'done')"
             )
-        if labels is not None and labels != "wontfix":
+        if label is not None and label != "wontfix":
             problems.append(
                 f"{name}: closed issues carry no label other than 'wontfix'; "
-                f"remove the '{labels}' label"
+                f"remove the '{label}' label"
             )
     elif status == "done":
         problems.append(
@@ -114,7 +113,7 @@ def check(name, status, labels, problems):
 def main():
     problems = []
     for name in staged_tracker_files():
-        if not UNIT_MARKER in name:
+        if UNIT_MARKER not in name:
             continue  # a feature-level doc, not a tracked unit
         path = Path(name)
         if not path.exists():
@@ -124,8 +123,8 @@ def main():
         except UnicodeDecodeError:
             problems.append(f"{name}: cannot be read as UTF-8; save it as UTF-8")
             continue
-        status, labels = parse_header(text)
-        check(name, status, labels, problems)
+        status, label = parse_header(text)
+        check(name, status, label, problems)
 
     if problems:
         print("")

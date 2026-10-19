@@ -9,7 +9,7 @@
     ".agents/kit/adr/0007-grill-before-pickup.md": "5dc3727f55de849195426edd1f88f1582d272af5b1309f4607e6e7e76be9c545",
     ".agents/kit/adr/archived/0001-agent-workflow.md": "9dbb149fd14f2d3a72aea7c56f812d30b99d85e319b92891becc4e5a87436d12",
     ".agents/kit/adr/archived/0002-agent-workflow-v2.md": "4dfe7b0cceca1ec836a6ca79ece2f4cceb4ed56f7ca757254165877774df3159",
-    ".agents/kit/check_tracker.py": "0a7aa30b1fe462a822eb8bd6679c1257b5845fe188d6297a8b84777787e277d4",
+    ".agents/kit/check_tracker.py": "1ca4f5627bf5bd068d452df4571693cbf101cb8e2f8e12a01b293fa80461092f",
     ".agents/kit/domain.md": "e3deee551ebddec713c880f157bee191e6aeafb4e277e588d116418c12dde8bd",
     ".agents/kit/harness.sh": "0db99c9484a2831b566643cffb4c6fe7437e7870d5c868f7e67344d2ee587b0b",
     ".agents/kit/hooks/pre-commit": "318bcf8ca86c0569284748cfd8398d7dce9b26385ab56f1f9f2a06fcee3d2f21",
