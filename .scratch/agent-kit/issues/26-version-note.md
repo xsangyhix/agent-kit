@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -11,10 +11,10 @@ None.
 
 ## Acceptance criteria
 
-- [ ] `CHANGELOG.md` exists at the repo root with a `0.1.0` entry.
-- [ ] The entry covers: the `agent-kit init` / `agent-kit update` commands; the workflow docs, issue tracker and guardrails installed under `.agents/`; and the vendored skills snapshot.
-- [ ] It records the kit's own license as "see LICENSE" and the vendored skills as MIT.
-- [ ] Written in English, plain markdown, as a project document (not an issue file).
+- [x] `CHANGELOG.md` exists at the repo root with a `0.1.0` entry.
+- [x] The entry covers: the `agent-kit init` / `agent-kit update` commands; the workflow docs, issue tracker and guardrails installed under `.agents/`; and the vendored skills snapshot.
+- [x] It records the kit's own license as "see LICENSE" and the vendored skills as MIT.
+- [x] Written in English, plain markdown, as a project document (not an issue file).
 
 ## Out of scope
 
