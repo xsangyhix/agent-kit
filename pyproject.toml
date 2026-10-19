@@ -8,6 +8,10 @@ version = "0.1.0"
 description = "Install and update a project-agnostic agent setup."
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = []
 
 [project.scripts]

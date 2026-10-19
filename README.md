@@ -279,4 +279,5 @@ The skill library under `src/agent_kit/payload/skills/` is Matt Pocock's
 `setup-matt-pocock-skills` skill, which this kit replaces; his files remain under his
 license.
 
-The kit's own files have no license yet.
+The kit's own files are MIT licensed, `Copyright (c) 2026 Marcin Słoń`, under
+the `LICENSE` file at the repository root.

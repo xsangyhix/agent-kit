@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -13,12 +13,12 @@ None.
 
 ## Acceptance criteria
 
-- [ ] A license is chosen and recorded (the user names it; MIT and Apache-2.0 are the common options for this kind of tool).
-- [ ] `LICENSE` (or `LICENSE.md`) exists at the repo root with the chosen license text.
-- [ ] `pyproject.toml` declares the license (a `license` field plus the matching `classifiers` entry).
-- [ ] `README.md`'s "Credits and licenses" section replaces "The kit's own files have no license yet." with the chosen license.
-- [ ] The whole suite still passes: `py -3.14 -m unittest discover -s tests -t .`.
-- [ ] `py -3.14 tools/check_payload_sync.py` still exits 0 (the payload and the installed copy are untouched by this change).
+- [x] A license is chosen and recorded (the user names it; MIT and Apache-2.0 are the common options for this kind of tool).
+- [x] `LICENSE` (or `LICENSE.md`) exists at the repo root with the chosen license text.
+- [x] `pyproject.toml` declares the license (a `license` field plus the matching `classifiers` entry).
+- [x] `README.md`'s "Credits and licenses" section replaces "The kit's own files have no license yet." with the chosen license.
+- [x] The whole suite still passes: `py -3.14 -m unittest discover -s tests -t .`.
+- [x] `py -3.14 tools/check_payload_sync.py` still exits 0 (the payload and the installed copy are untouched by this change).
 
 ## Questions
 
