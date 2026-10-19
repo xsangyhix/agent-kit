@@ -105,6 +105,19 @@ class LocalHookTests(unittest.TestCase):
         self.assertTrue(python)
         self.assertEqual(branch, "dev")
 
+    def test_local_hook_sees_the_protected_branch(self):
+        repo = support.make_repo(self, "dev")
+        repo.write(
+            ".agents/hooks.local/pre-commit",
+            "#!/bin/sh\nprintf '%s\\n' \"$PROTECTED_BRANCH\" > local-hook-branch\n",
+        )
+
+        result = repo.run_hook(SHELL)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        protected = (repo.root / "local-hook-branch").read_text(encoding="utf-8")
+        self.assertEqual(protected.strip(), "dev")
+
     def test_no_local_hook_is_allowed(self):
         repo = support.make_repo(self, "agent/test")
 

@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -35,14 +35,46 @@ None.
 
 ## Acceptance criteria
 
-- [ ] A local hook that prints `$PROTECTED_BRANCH` prints `dev`. A test covers it.
-- [ ] The probe comment exists, and the hook's behaviour is otherwise unchanged (existing hook tests pass).
-- [ ] `README.md` documents the probe and the exported `PROTECTED_BRANCH`.
-- [ ] The hook is LF only, and `.agents/kit/hooks/pre-commit` is identical to the payload, with `.agents/kit.lock` matching.
-- [ ] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
+- [x] A local hook that prints `$PROTECTED_BRANCH` prints `dev`. A test covers it.
+- [x] The probe comment exists, and the hook's behaviour is otherwise unchanged (existing hook tests pass).
+- [x] `README.md` documents the probe and the exported `PROTECTED_BRANCH`.
+- [x] The hook is LF only, and `.agents/kit/hooks/pre-commit` is identical to the payload, with `.agents/kit.lock` matching.
+- [x] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
 
 ## Out of scope
 
 - Making the protected branch configurable (design §13).
 - The executable bit of the installed hook (agent-kit/11-kit-hook-executable-bit).
 - Changing rc-machines' local hook (agent-kit/22-rc-machines-takes-the-kit-fixes).
+
+## Review
+
+Implementation complete, submitted for review.
+
+### Summary of changes
+
+`src/agent_kit/payload/kit/hooks/pre-commit`:
+
+- **The interpreter probe is explained.** The comment above step 3 now says why it runs `python3 --version` rather than checking that the command exists: on Windows the Microsoft Store alias sits on PATH but fails when run, so it would win.
+- **The protected branch is exported.** Step 4 now exports `PYTHON branch PROTECTED_BRANCH`, and its comment says local hooks see all three.
+
+`README.md`:
+
+- The hook description says the checks use the project's `.venv` interpreter when there is one, otherwise `python3` only when that command actually runs, then `python`.
+- "Project-specific steps" now lists `PROTECTED_BRANCH` alongside `PYTHON` and `branch`.
+
+`tests/guardrail/test_pre_commit_hook.py`:
+
+- `LocalHookTests.test_local_hook_sees_the_protected_branch` writes a local hook that prints `$PROTECTED_BRANCH` and asserts it prints `dev`.
+
+`.agents/kit/hooks/pre-commit` and `.agents/kit.lock` were refreshed with `PYTHONPATH=src py -3.14 -m agent_kit update`. The change is purely additive; existing local hooks ignore the new variable.
+
+### Verification
+
+TDD: the new test failed first (`'' != 'dev'`), then passed once `PROTECTED_BRANCH` was exported.
+
+- `py -3.14 -m unittest tests.guardrail.test_pre_commit_hook -v`: 19 tests, OK.
+- `py -3.14 -m unittest discover -s tests -t . -v`: 166 tests, OK (skipped=1). The skip is the pre-existing Windows-only on-disk mode test.
+- `PYTHONPATH=src py -3.14 -m agent_kit update` exits 0, and `.agents/kit/hooks/pre-commit` is identical to the payload.
+- `py -3.14 tools/check_payload_sync.py` exits 0.
+- The payload hook has no CR bytes: 0 CRLF pairs, 0 CR bytes.

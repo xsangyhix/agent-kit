@@ -134,7 +134,10 @@ git commit -m "Install the agent kit"
 
 The pre-commit hook is active from the next commit. It refuses a `dev` commit made in
 an agent session, refuses a commit when `.scratch` is gitignored, and validates the
-issue tracker's invariants.
+issue tracker's invariants. It runs those checks with the project's `.venv`
+interpreter when there is one; otherwise it uses `python3` only when that command
+actually runs, which is what skips the Microsoft Store alias on Windows, and falls
+back to `python`.
 
 ## Update a project
 
@@ -208,8 +211,10 @@ The kit's hook runs these project-owned files if they exist, and never creates t
 
 - **`.agents/hooks.local/pre-commit`** — optional extra pre-commit steps. The kit's
   hook runs it after the tracker check, from the project root, with `PYTHON` (the
-  interpreter it resolved) and `branch` exported. A non-zero exit refuses the commit
-  with that status. This is where a project's own tests, linters, or release build go.
+  interpreter it resolved), `branch` (the branch being committed) and
+  `PROTECTED_BRANCH` (the branch the kit protects, `dev`) exported. A non-zero exit
+  refuses the commit with that status. This is where a project's own tests, linters,
+  or release build go.
 
   The kit never writes this file, so it cannot record the mode for you: git must see
   it as executable, or a POSIX checkout silently skips it. After staging it, run

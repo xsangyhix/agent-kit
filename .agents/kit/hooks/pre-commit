@@ -58,7 +58,9 @@ if git check-ignore -q .scratch; then
 fi
 
 # 3. Issue file invariants: status vocabulary, label vocabulary, close rules.
-# Resolve the interpreter once; the local hook reuses it.
+# Resolve the interpreter once; the local hook reuses it. The python3 probe runs
+# `--version` rather than checking that the command exists: on Windows the
+# Microsoft Store alias sits on PATH but fails when run, so it would win.
 if [ -f "./.venv/Scripts/python.exe" ]; then
     PYTHON=./.venv/Scripts/python.exe
 elif [ -f "./.venv/bin/python" ]; then
@@ -71,10 +73,11 @@ fi
 
 "$PYTHON" .agents/kit/check_tracker.py || exit 1
 
-# 4. Project-specific steps, if this project has any. They see the interpreter
-# and branch the kit resolved, and their exit status is the hook's.
+# 4. Project-specific steps, if this project has any. They see the interpreter,
+# branch and protected branch the kit resolved, and their exit status is the
+# hook's.
 if [ -f .agents/hooks.local/pre-commit ]; then
-    export PYTHON branch
+    export PYTHON branch PROTECTED_BRANCH
     sh .agents/hooks.local/pre-commit
     local_status=$?
     if [ "$local_status" -ne 0 ]; then
