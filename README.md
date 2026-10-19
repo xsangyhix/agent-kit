@@ -39,17 +39,20 @@ The project itself can be written in any language. The kit only adds files under
 
 ## Install the tool
 
+Replace `<path-to-this-repo>` with the path to your checkout; a published package name
+will replace it once there is a release.
+
 With pipx (the `--python 3.14` is required because pipx otherwise picks the system
 Python):
 
 ```
-pipx install --python 3.14 D:\Marcin\PycharmProjects\agent-kit
+pipx install --python 3.14 <path-to-this-repo>
 ```
 
 Or with uv:
 
 ```
-uv tool install --python 3.14 D:\Marcin\PycharmProjects\agent-kit
+uv tool install --python 3.14 <path-to-this-repo>
 ```
 
 Check it:
@@ -61,13 +64,13 @@ agent-kit --version
 To upgrade the tool, reinstall it:
 
 ```
-pipx install --force --python 3.14 D:\Marcin\PycharmProjects\agent-kit
+pipx install --force --python 3.14 <path-to-this-repo>
 ```
 
 or, with uv:
 
 ```
-uv tool install --force --python 3.14 D:\Marcin\PycharmProjects\agent-kit
+uv tool install --force --python 3.14 <path-to-this-repo>
 ```
 
 The tool and the kit are separate: upgrading the installed tool does not change any
