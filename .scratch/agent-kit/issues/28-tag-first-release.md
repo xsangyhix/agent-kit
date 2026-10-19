@@ -15,10 +15,10 @@ This is a human step: the pre-commit hook refuses an agent session's commit on `
 
 ## Acceptance criteria
 
-- [ ] Tickets 25, 26 and 27 are `done`.
-- [ ] `agent/agent-kit` is merged into `dev` (all commits of the effort are reachable from `dev`).
-- [ ] `v0.1.0` is tagged on `dev`.
-- [ ] `agent-kit --version` reports `0.1.0`.
+- [x] Tickets 25, 26 and 27 are `done`.
+- [x] `agent/agent-kit` is merged into `dev` (all commits of the effort are reachable from `dev`).
+- [x] `v0.1.0` is tagged on `dev`.
+- [x] `agent-kit --version` reports `0.1.0`.
 
 ## Out of scope
 
