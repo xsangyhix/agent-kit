@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: awaiting-agent
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -11,9 +11,9 @@ None.
 
 ## Acceptance criteria
 
-- [ ] The `pipx install` / `uv tool install` examples no longer contain `D:\Marcin\PycharmProjects\agent-kit`; they use a placeholder such as `<path-to-this-repo>` (or the published package name once released).
-- [ ] The upgrade examples (`pipx install --force`, `uv tool install --force`) stay consistent with the install examples.
-- [ ] The suite still passes and `py -3.14 tools/check_payload_sync.py` still exits 0.
+- [x] The `pipx install` / `uv tool install` examples no longer contain `D:\Marcin\PycharmProjects\agent-kit`; they use a placeholder such as `<path-to-this-repo>` (or the published package name once released).
+- [x] The upgrade examples (`pipx install --force`, `uv tool install --force`) stay consistent with the install examples.
+- [x] The suite still passes and `py -3.14 tools/check_payload_sync.py` still exits 0.
 
 ## Out of scope
 
