@@ -7,7 +7,9 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-TOOL = Path(__file__).resolve().parents[1] / "tools" / "refresh_skills.py"
+REPO = Path(__file__).resolve().parents[1]
+TOOL = REPO / "tools" / "refresh_skills.py"
+COMMITTED_UPSTREAM = REPO / "src" / "agent_kit" / "payload" / "skills" / "UPSTREAM"
 
 SPEC = importlib.util.spec_from_file_location("refresh_skills", TOOL)
 refresh_skills = importlib.util.module_from_spec(SPEC)
@@ -102,6 +104,44 @@ class RefreshSkillsTests(unittest.TestCase):
             f"fetched: {date.today().isoformat()}\n"
             "license: MIT (see LICENSE in this folder)\n"
             "excluded: skills/deprecated/, skills/engineering/setup-matt-pocock-skills/\n",
+        )
+
+    def test_generated_record_matches_the_committed_upstream_file(self):
+        self.write_archive(self.standard_members())
+
+        code, stdout, stderr = self.run_tool(["--archive", str(self.archive), SHA])
+
+        self.assertEqual(code, 0, stderr)
+        generated = (self.target / "UPSTREAM").read_text(encoding="utf-8")
+        committed = COMMITTED_UPSTREAM.read_text(encoding="utf-8")
+        expected = "".join(
+            f"fetched: {date.today().isoformat()}\n"
+            if line.startswith("fetched: ")
+            else line
+            for line in committed.splitlines(keepends=True)
+        )
+        self.assertEqual(generated, expected)
+
+    def test_excluded_tuple_drives_both_the_copy_and_the_record(self):
+        self.write_archive(self.standard_members())
+        original = refresh_skills.EXCLUDED
+        refresh_skills.EXCLUDED = original + (
+            "skills/misc",
+            "skills/productivity/grilling",
+        )
+        self.addCleanup(setattr, refresh_skills, "EXCLUDED", original)
+
+        code, stdout, stderr = self.run_tool(["--archive", str(self.archive), SHA])
+
+        self.assertEqual(code, 0, stderr)
+        self.assertFalse((self.target / "misc").exists())
+        self.assertFalse((self.target / "productivity" / "grilling").exists())
+        record = (self.target / "UPSTREAM").read_text(encoding="utf-8")
+        self.assertIn(
+            "excluded: skills/deprecated/, "
+            "skills/engineering/setup-matt-pocock-skills/, "
+            "skills/misc/, skills/productivity/grilling/\n",
+            record,
         )
 
     def prepare_existing_payload(self):

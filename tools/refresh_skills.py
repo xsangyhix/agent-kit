@@ -25,15 +25,26 @@ ARCHIVE_URL = "https://codeload.github.com/mattpocock/skills/tar.gz/{sha}"
 
 CATEGORIES = ("engineering", "productivity", "misc", "in-progress")
 
-EXCLUDED = ("skills/engineering/setup-matt-pocock-skills",)
+EXCLUDED = (
+    "skills/deprecated",
+    "skills/engineering/setup-matt-pocock-skills",
+)
 
 UPSTREAM = (
     "source: https://github.com/mattpocock/skills\n"
     "commit: {sha}\n"
     "fetched: {fetched}\n"
     "license: MIT (see LICENSE in this folder)\n"
-    "excluded: skills/deprecated/, skills/engineering/setup-matt-pocock-skills/\n"
+    "excluded: {excluded}\n"
 )
+
+
+def excluded_line(paths=None):
+    """Return the ``excluded:`` value: each path with a trailing slash, joined."""
+    if paths is None:
+        paths = EXCLUDED
+    return ", ".join(f"{path}/" for path in paths)
+
 
 DEFAULT_TARGET = (
     Path(__file__).resolve().parents[1] / "src" / "agent_kit" / "payload" / "skills"
@@ -169,6 +180,8 @@ def build(sha, source, staging):
         return ignored
 
     for category in CATEGORIES:
+        if f"skills/{category}" in EXCLUDED:
+            continue
         shutil.copytree(
             source / "skills" / category,
             staging / category,
@@ -176,7 +189,11 @@ def build(sha, source, staging):
         )
 
     shutil.copyfile(source / "LICENSE", staging / "LICENSE")
-    record = UPSTREAM.format(sha=sha, fetched=date.today().isoformat())
+    record = UPSTREAM.format(
+        sha=sha,
+        fetched=date.today().isoformat(),
+        excluded=excluded_line(),
+    )
     (staging / "UPSTREAM").write_bytes(record.encode("utf-8"))
 
     loose_markdown = [
