@@ -1,5 +1,5 @@
-Labels: ready-for-agent
-Status: in-progress
+Labels: ready-for-human
+Status: in-review
 
 ## Description
 
@@ -28,11 +28,11 @@ None.
 
 ## Acceptance criteria
 
-- [ ] `pyproject.toml` declares `license = "MIT"` and carries no `License ::` classifier.
-- [ ] The build-system requirement names a setuptools that supports PEP 639 (`>=77`).
-- [ ] `py -3.14 -m unittest tests.test_packaging -v` passes.
-- [ ] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
-- [ ] `py -3.14 tools/check_payload_sync.py` exits 0.
+- [x] `pyproject.toml` declares `license = "MIT"` and carries no `License ::` classifier.
+- [x] The build-system requirement names a setuptools that supports PEP 639 (`>=77`).
+- [x] `py -3.14 -m unittest tests.test_packaging -v` passes.
+- [x] The whole suite passes: `py -3.14 -m unittest discover -s tests -t . -v`.
+- [x] `py -3.14 tools/check_payload_sync.py` exits 0.
 
 ## Out of scope
 
